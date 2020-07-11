@@ -23,6 +23,7 @@ import json
 
 from deploy.config import IS_PROXY_RUN, PROXY_API
 from deploy.utils.utils import random_sleep
+from deploy.utils.logger import logger as LOG
 
 
 def api_post(url, headers={}, data={},

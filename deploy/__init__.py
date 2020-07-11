@@ -27,6 +27,7 @@ from deploy.utils.base_class import BASECLASS
 from deploy.client.tianyancha import TianYanChaClient
 from deploy.utils.to_excel import ToExcel
 from deploy.utils.utils import get_now, get_excel_folder
+from deploy.services.enterprise import EnterpriseService
 
 
 # 支持协程
@@ -39,7 +40,8 @@ ATTRS_DICT = {
     'name': "名称",
     'email': "邮箱",
     'phone': "电话",
-    'company_url': "天眼查URL",
+    'tyt_url': "天眼查URL",
+    'company_url': "公司官网",
     'address': "地址",
     'register_funds': "注册资金",
     'paidin_funds': "实缴资金",
@@ -72,6 +74,7 @@ class SpiderTYCClass(BASECLASS):
         self.store_excel_dir = OUTPUT_BASE_DIR
         self.tyc_client = TianYanChaClient()
         self.excel_client = ToExcel()
+        self.enterprise_service = EnterpriseService()
         self.__init_return_res()
 
     def __init_return_res(self):
@@ -93,12 +96,16 @@ class SpiderTYCClass(BASECLASS):
 
             self._print_info(key)
             self.ret_res_list.extend(self.tyc_client.work_by_key(key))
+        print(len(self.ret_res_list))
         if STORE_EXCEL:
             to_excel_name = os.path.join(get_excel_folder(),
                                          '%s-%s.xls' % (get_now(), '_'.join(self.keys)))
             self.excel_client.to_excel(self.ret_res_list, ATTRS_DICT,
                                        to_excel_name)
             LOG.info(to_excel_name)
+        if STORE_DB:
+            self.enterprise_service.adds(datas=self.ret_res_list)
+            LOG.info('DB is finished.......')
 
 
     def process_run(self):
@@ -128,4 +135,5 @@ class SpiderTYCClass(BASECLASS):
 def start():
     LOG.info('%s start run......' % NAME)
     SpiderTYCClass().init_run()
-    LOG.info('%s start run......' % NAME)
+    LOG.info('%s end run......' % NAME)
+

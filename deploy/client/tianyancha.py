@@ -66,6 +66,26 @@ class TianYanChaClient(object):
 
             soup = BeautifulSoup(search_resp, 'lxml')
             tags = soup.find_all('a', attrs={"tyc-event-ch": "CompanySearch.Company"})
+
+            def while_req(url):
+                sub_is_ok, sub_search_resp = api_get(url=url,
+                                         headers=self.headers,
+                                         data={},
+                                         resptype='text')
+                return sub_is_ok, sub_search_resp
+
+            # 添加手动验证功能
+            if len(tags) == 0:
+                while 1:
+                    if is_ok and len(tags) > 0:
+                        break
+                    else:
+                        LOG.critical('验证############### %s ###############' % url)
+                        random_sleep(20,25)
+                        is_ok, search_resp = while_req(url)
+                        soup = BeautifulSoup(search_resp, 'lxml')
+                        tags = soup.find_all('a', attrs={"tyc-event-ch": "CompanySearch.Company"})
+
             for tag in tags:
                 if not tag or not tag.attrs.get('href'):
                     continue
@@ -78,9 +98,9 @@ class TianYanChaClient(object):
                 res_dict.update(detail_res)
                 print(res_dict['name'], res_dict['tyt_url'], str(True if res_dict else False))
                 ret_res.append(res_dict)
-                random_sleep()
-                #     break
-                # break
+                random_sleep(1, 2.5)
+            #     break
+            # break
         return ret_res
 
     def detail_by_url(self, comp_url: str):
@@ -99,8 +119,25 @@ class TianYanChaClient(object):
 
         # detail: 电话 邮箱 公司官网 地址 简介
         detail_div = soup.find_all('div', class_="detail")
+
+        def while_req(url):
+            sub_is_ok, sub_search_resp = api_get(url=url,
+                                     headers=self.headers,
+                                     data={},
+                                     resptype='text')
+            return sub_is_ok, sub_search_resp
+
+        # 添加手动验证功能
         if not detail_div:
-            return detail_res
+            while 1:
+                if is_ok and detail_div:
+                    break
+                else:
+                    LOG.critical('验证############### %s ###############' % comp_url)
+                    random_sleep(20, 25)
+                    is_ok, search_resp = while_req(comp_url)
+                    soup = BeautifulSoup(search_resp, 'lxml')
+                    detail_div = soup.find_all('div', class_="detail")
 
         for div in detail_div[0].find_all('div'):
             if not div:

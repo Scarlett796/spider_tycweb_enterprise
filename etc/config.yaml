@@ -2,7 +2,7 @@ SERVER:
   NAME: Spider_TYC_Enterprise
   VERSION: 1.0.0
   DEBUG: True
-  KEYS: 环保设备
+  KEYS: 环保设备,环保科技,河北环保
   RUN_MODE: single
 
 
@@ -34,4 +34,4 @@ APIS:
 
 PROXY:
   IS_RUN: True
-  API: http://127.0.0.1:5555/random
+  API: http://212.64.61.62:5555/random
