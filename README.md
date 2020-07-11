@@ -17,19 +17,32 @@
 - 安装项目运行的环境：python install_env.py，建立项目独立的运行环境，安装了virtualenv、python、packages等操作，了解具体详情请参考代码
 - 启动项目：项目root目录，执行python run.py
 
+> ### 配置说明
+
+位置：etc/config.yaml
+- SERVER: 服务基础信息
+- LOG: 日志
+- DB: 数据库连接
+- FILES: 文件输出位置
+- STORE: 输出方式，excel与db，
+- APIS: 天眼查的APIS
+- PROXY: 代理相关的API
+
 > ### 问题
 
 1、需要在etc/config.yaml进行配置相关信息，cookie建议填写，否则爬取的数据电话、邮箱等信息是带有**号的。
 2、未注册的用户只能查找遍历5页，目前这个没什么好的方案解决。
+3、需要手动进行验证码验证
 
 > ### 已完善功能
 
 - 数据爬取
-- 数据写入入excel
+- 数据写入excel
+- 数据写入DB
 
 > ### 开发中功能
 
-1、
+1、解决手动验证的问题
 
 
 > ### 特别声明
