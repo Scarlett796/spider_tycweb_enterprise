@@ -86,5 +86,5 @@ class EnterpriseService(object):
             self.enterprise_bo.add_model(new_model)
             success_list.append(name)
         else:
-            print('success list【%s】:%s' % (','.join(success_list), len(success_list)))
-            print('failure list【%s】:%s' % (','.join(failure_list), len(failure_list)))
+            print('success list【%s】:%s' % (len(success_list), ','.join(success_list)))
+            print('failure list【%s】:%s' % (len(failure_list), ','.join(failure_list)))

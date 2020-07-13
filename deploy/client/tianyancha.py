@@ -55,7 +55,7 @@ class TianYanChaClient(object):
 
         # page
         for page in range(0, self.MAX_PAGE, 1):
-            url = TYC_SEARCH_API + '/p%s?key=' % page + parse.quote(key)
+            url = '%s/p%s?key=%s' % (TYC_SEARCH_API, page, parse.quote(key))
             print(url)
             is_ok, search_resp = api_get(url=url,
                                          headers=self.headers,

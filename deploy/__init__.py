@@ -96,7 +96,7 @@ class SpiderTYCClass(BASECLASS):
 
             self._print_info(key)
             self.ret_res_list.extend(self.tyc_client.work_by_key(key))
-        print(len(self.ret_res_list))
+
         if STORE_EXCEL:
             to_excel_name = os.path.join(get_excel_folder(),
                                          '%s-%s.xls' % (get_now(), '_'.join(self.keys)))

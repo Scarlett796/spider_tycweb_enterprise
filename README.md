@@ -21,10 +21,10 @@
 
 位置：etc/config.yaml
 - SERVER: 服务基础信息
-- LOG: 日志
-- DB: 数据库连接
-- FILES: 文件输出位置
-- STORE: 输出方式，excel与db，
+- LOG: 日志，如果无LOG_DIR默认会在项目root目录下建立log文件夹进行日志存放
+- DB: 数据库连接，项目中包含数据库信息（请勿乱更改或者操作数据库）
+- FILES: 文件输出位置，如果无默认会在项目root目录下建立excel文件夹进行数据存放
+- STORE: 输出方式，excel与db
 - APIS: 天眼查的APIS
 - PROXY: 代理相关的API
 
