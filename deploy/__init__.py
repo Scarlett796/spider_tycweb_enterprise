@@ -31,8 +31,14 @@ from deploy.services.enterprise import EnterpriseService
 
 
 # 支持协程
-# from gevent import monkey; monkey.patch_all()
 # import gevent
+# from gevent import monkey; monkey.patch_all()
+
+# 支持多进程
+import multiprocessing
+
+
+MAX_CPU = multiprocessing.cpu_count()
 
 
 MODES = ['single', 'gevent', 'process']
@@ -109,14 +115,34 @@ class SpiderTYCClass(BASECLASS):
 
 
     def process_run(self):
-        pass
+        pool = multiprocessing.Pool(processes=(MAX_CPU-1 if MAX_CPU > 2 else 1))
+        result = []
+        for key in self.keys:
+            if not key:
+                continue
+            result.append(
+                pool.apply_async(self.tyc_client.work_by_key, args=(key, ))
+            )
+        pool.close()
+        pool.join()
+
+        [self.ret_res_list.extend(x.get()) for x in result if x]
+        if STORE_EXCEL:
+            to_excel_name = os.path.join(get_excel_folder(),
+                                         '%s-%s.xls' % (get_now(), '_'.join(self.keys)))
+            self.excel_client.to_excel(self.ret_res_list, ATTRS_DICT,
+                                       to_excel_name)
+            LOG.info(to_excel_name)
+        if STORE_DB:
+            self.enterprise_service.adds(datas=self.ret_res_list)
+            LOG.info('DB is finished.......')
 
     def gevent_run(self):
         jobs = list()
         for key in self.keys:
             if not key:
                 continue
-            # jobs.append(gevent.spawn(self.service.aprv_new, content, pid))
+        #     jobs.append(gevent.spawn(self.tyc_client.work_by_key, args=(key, ))
         # gevent.joinall(jobs)
 
     def init_run(self):

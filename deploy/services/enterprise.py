@@ -52,6 +52,7 @@ class EnterpriseService(object):
     def adds(self, datas):
         if not datas:
             LOG.error('DB: data is null.')
+            return
 
         failure_list = list()
         success_list = list()
@@ -88,3 +89,4 @@ class EnterpriseService(object):
         else:
             print('success list【%s】:%s' % (len(success_list), ','.join(success_list)))
             print('failure list【%s】:%s' % (len(failure_list), ','.join(failure_list)))
+            return success_list, failure_list

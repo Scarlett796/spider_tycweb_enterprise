@@ -3,7 +3,7 @@ SERVER:
   VERSION: 1.0.0
   DEBUG: True
   KEYS: 环保设备,环保科技,河北环保
-  RUN_MODE: single
+  RUN_MODE: process  # single单进程 process多进程 gevent多协程
 
 
 LOG:

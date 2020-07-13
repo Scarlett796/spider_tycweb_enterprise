@@ -99,8 +99,8 @@ class TianYanChaClient(object):
                 print(res_dict['name'], res_dict['tyt_url'], str(True if res_dict else False))
                 ret_res.append(res_dict)
                 random_sleep(1, 2.5)
-            #     break
-            # break
+                break
+            break
         return ret_res
 
     def detail_by_url(self, comp_url: str):
