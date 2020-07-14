@@ -84,9 +84,12 @@ OUTPUT_BASE_DIR = __get_excel_dir()
 STORE_EXCEL = True
 STORE_DB = False
 
-#apis
+# apis
+API_MODE = 'tyc'
 TYC_SEARCH_API = None
 TYC_DETAIL_API = None
+TYC_PRO_SEARCH_API = None
+TYC_PRO_DETAIL_API = None
 TYC_COOKIE = None
 
 # proxy
@@ -139,8 +142,14 @@ with open(_config_file) as f:
     STORE_DB = _config_info['STORE']['DB'] or STORE_DB
 
     # api
+    API_MODE = _config_info['APIS']['API_MODE'] or API_MODE
+    if API_MODE not in ['tyc', 'pro']:
+        logger.critical('====== API_MODE is not in [tyc, pro] ======')
+        sys.exit(1)
     TYC_SEARCH_API = _config_info['APIS']['TYC_SEARCH'] or TYC_SEARCH_API
     TYC_DETAIL_API = _config_info['APIS']['TYC_DETAIL'] or TYC_DETAIL_API
+    TYC_PRO_SEARCH_API = _config_info['APIS']['TYC_PRO_SEARCH'] or TYC_PRO_SEARCH_API
+    TYC_PRO_DETAIL_API = _config_info['APIS']['TYC_PRO_DETAIL'] or TYC_PRO_DETAIL_API
     TYC_COOKIE = _config_info['APIS']['TYC_COOKIE'] or TYC_COOKIE
 
     # proxy

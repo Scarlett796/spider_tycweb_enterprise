@@ -6,7 +6,7 @@ CREATE TABLE `enterprise`.`enterprise` (
 	`name` varchar(100) COMMENT '企业名称',
 	`email` varchar(55) COMMENT '邮箱',
 	`phone` varchar(55) COMMENT '电话',
-	`tyt_url` varchar(100) COMMENT '天眼查URL',
+	`tyc_url` varchar(100) COMMENT '天眼查URL',
 	`company_url` varchar(100) COMMENT '公司官网',
 	`address` varchar(255) COMMENT '地址',
 	`register_funds` varchar(20) COMMENT '注册资金',

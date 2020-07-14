@@ -36,7 +36,7 @@ class EnterpriseModel(base.ModelBase):
     name = Column(String(100))
     email = Column(String(55))
     phone = Column(String(55))
-    tyt_url = Column(String(100))
+    tyc_url = Column(String(100))
     company_url = Column(String(100))
     address = Column(String(255))
     register_funds = Column(String(20))

@@ -71,7 +71,7 @@ class EnterpriseService(object):
             new_model.name = name
             new_model.phone = data.get('phone')
             new_model.email = data.get('email')
-            new_model.tyt_url = data.get('tyt_url')
+            new_model.tyc_url = data.get('tyc_url')
             new_model.company_url = data.get('company_url')
             new_model.address = data.get('address')
             new_model.register_funds = data.get('register_funds')
@@ -84,8 +84,12 @@ class EnterpriseService(object):
             new_model.business_term = data.get('business_term')
             new_model.resume = data.get('resume')
             new_model.business_scope = data.get('business_scope')
-            self.enterprise_bo.add_model(new_model)
-            success_list.append(name)
+            try:
+                self.enterprise_bo.add_model(new_model)
+                success_list.append(name)
+            except:
+                LOG.error(data)
+                failure_list.append(name)
         else:
             print('success list【%s】:%s' % (len(success_list), ','.join(success_list)))
             print('failure list【%s】:%s' % (len(failure_list), ','.join(failure_list)))

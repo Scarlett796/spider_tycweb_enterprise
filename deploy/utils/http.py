@@ -110,6 +110,7 @@ def api_get(url,  headers={}, data={},
             raise Exception(u'api_get error: %s' % e)
     else:
         respcode = response.status_code
+        # print(respcode, response.content)
         if respcode != 200:
             return False, 'api_get response status code is: %s' % respcode
         elif respcode == 200 and resptype == 'raw':

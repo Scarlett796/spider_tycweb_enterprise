@@ -21,7 +21,8 @@ import os
 import sys
 
 from deploy.config import NAME, VERSION, KEYS, DEBUG,\
-    STORE_DB, STORE_EXCEL, OUTPUT_BASE_DIR, RUN_MODE, STORE_EXCEL
+    STORE_DB, STORE_EXCEL, OUTPUT_BASE_DIR, RUN_MODE, \
+    STORE_EXCEL, API_MODE
 from deploy.utils.logger import logger as LOG
 from deploy.utils.base_class import BASECLASS
 from deploy.client.tianyancha import TianYanChaClient
@@ -46,7 +47,7 @@ ATTRS_DICT = {
     'name': "名称",
     'email': "邮箱",
     'phone': "电话",
-    'tyt_url': "天眼查URL",
+    'tyc_url': "天眼查URL",
     'company_url': "公司官网",
     'address': "地址",
     'register_funds': "注册资金",
@@ -105,7 +106,7 @@ class SpiderTYCClass(BASECLASS):
 
         if STORE_EXCEL:
             to_excel_name = os.path.join(get_excel_folder(),
-                                         '%s-%s.xls' % (get_now(), '_'.join(self.keys)))
+                                         '%s[%s]-%s.xls' % (get_now(), API_MODE, '_'.join(self.keys)))
             self.excel_client.to_excel(self.ret_res_list, ATTRS_DICT,
                                        to_excel_name)
             LOG.info(to_excel_name)
@@ -129,7 +130,7 @@ class SpiderTYCClass(BASECLASS):
         [self.ret_res_list.extend(x.get()) for x in result if x]
         if STORE_EXCEL:
             to_excel_name = os.path.join(get_excel_folder(),
-                                         '%s-%s.xls' % (get_now(), '_'.join(self.keys)))
+                                         '%s[%s]-%s.xls' % (get_now(), API_MODE, '_'.join(self.keys)))
             self.excel_client.to_excel(self.ret_res_list, ATTRS_DICT,
                                        to_excel_name)
             LOG.info(to_excel_name)

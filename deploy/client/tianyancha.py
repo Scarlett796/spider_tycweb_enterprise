@@ -17,11 +17,13 @@ base_info:
 # ------------------------------------------------------------
 # usage: /usr/bin/python tianyancha.py
 # ------------------------------------------------------------
+import sys
 from urllib import parse
 from bs4 import BeautifulSoup
 
-from deploy.config import RUN_MODE, TYC_DETAIL_API, \
-    TYC_SEARCH_API, TYC_COOKIE
+from deploy.config import RUN_MODE, API_MODE, TYC_COOKIE, \
+    TYC_SEARCH_API, TYC_DETAIL_API, \
+    TYC_PRO_SEARCH_API, TYC_PRO_DETAIL_API
 from deploy.utils.http import api_get
 from deploy.utils.logger import logger as LOG
 from deploy.utils.utils import random_sleep
@@ -34,14 +36,24 @@ class TianYanChaClient(object):
 
     def __init__(self):
         super(object, self).__init__()
-        self.MAX_PAGE = 5
+        self.MAX_PAGE = self._init_max_page()
+        self.MIN_PAGE = 0
         self._init_header()
 
+    def _init_max_page(self):
+        return 10
+
     def _init_header(self):
+        if API_MODE == 'tyc':
+            host = 'www.tianyancha.com'
+        elif API_MODE == 'pro':
+            host = 'pro.tianyancha.com'
+        else:
+            host = 'www.tianyancha.com'
         self.headers = {
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.116 Safari/537.36",
             "version": "TYC-XCX-WX",
-            "Host": "www.tianyancha.com",
+            "Host": host,
             "Cookie": TYC_COOKIE,
             "Connection": "keep-alive",
             "Sec-Fetch-Dest": "document"
@@ -54,13 +66,21 @@ class TianYanChaClient(object):
             return ret_res
 
         # page
-        for page in range(0, self.MAX_PAGE, 1):
-            url = '%s/p%s?key=%s' % (TYC_SEARCH_API, page, parse.quote(key))
+        for page in range(self.MIN_PAGE, self.MAX_PAGE, 1):
+            if API_MODE == 'tyc':
+                url = '%s/p%s?key=%s' % (TYC_SEARCH_API, page, parse.quote(key))
+            elif API_MODE == 'pro':
+                 url = '%s/p%s?key=%s' % (TYC_PRO_SEARCH_API, page, parse.quote(key))
+            else:
+                LOG.critical('====== API_MODE is not in [tyc, pro] ======')
+                sys.exit(1)
             print(url)
+
             is_ok, search_resp = api_get(url=url,
                                          headers=self.headers,
                                          data={},
                                          resptype='text')
+
             if not is_ok:
                 continue
 
@@ -91,16 +111,25 @@ class TianYanChaClient(object):
                     continue
 
                 res_dict = dict()
-                res_dict['tyt_url'] = tag.get('href').strip()
+                if API_MODE == 'tyc':
+                    tyc_url = tag.get('href').strip()
+                elif API_MODE == 'pro':
+                    tyc_url = '%s%s/background' % (TYC_PRO_DETAIL_API, tag.get('href').strip())
+                else:
+                    tyc_url = ''
+                res_dict['tyc_url'] = tyc_url
                 res_dict['name'] = tag.get_text().strip()
-
-                detail_res = self.detail_by_url(res_dict.get('tyt_url'))
+                detail_res = list()
+                if API_MODE == 'tyc':
+                    detail_res = self.detail_by_url(res_dict.get('tyc_url'))
+                elif API_MODE == 'pro':
+                    detail_res = self.detail_pro_by_url(res_dict.get('tyc_url'))
                 res_dict.update(detail_res)
-                print(res_dict['name'], res_dict['tyt_url'], str(True if res_dict else False))
+                print(res_dict['name'], res_dict['tyc_url'], str(True if res_dict else False))
                 ret_res.append(res_dict)
-                random_sleep(1, 2.5)
-                break
-            break
+                random_sleep(3, 4.5)
+            #     break
+            # break
         return ret_res
 
     def detail_by_url(self, comp_url: str):
@@ -213,13 +242,13 @@ class TianYanChaClient(object):
                                                 detail_res['paidin_funds'] = td.get_text().strip() or '-'
                                     elif index_tr == 1:
                                         for index_td, td in enumerate(tr.find_all('td')):
-                                            if index_td == 1:  # 注册资本
+                                            if index_td == 1:  # 成立日期
                                                 detail_res['establish_date'] = td.get_text().strip() or '-'
                                             elif index_td == 3:  # 经营状态
                                                 detail_res['status'] = td.get_text().strip() or '-'
                                     elif index_tr == 2:
                                         for index_td, td in enumerate(tr.find_all('td')):
-                                            if index_td == 1:  # 注册资本
+                                            if index_td == 1:  # 信用代码
                                                 detail_res['credit_code'] = td.get_text().strip() or '-'
                                     elif index_tr == 4:
                                         for index_td, td in enumerate(tr.find_all('td')):
@@ -238,5 +267,149 @@ class TianYanChaClient(object):
 
                         break
                 break
+        return detail_res
+
+    def detail_pro_by_url(self, comp_url: str):
+        detail_res = dict()
+        if not comp_url:
+            return detail_res
+
+        is_ok, search_resp = api_get(url=comp_url,
+                                     headers=self.headers,
+                                     data={},
+                                     resptype='text')
+        if not is_ok:
+            return detail_res
+
+        soup = BeautifulSoup(search_resp, 'lxml')
+
+        # detail: 电话 邮箱 公司官网 地址 简介
+        detail_div = soup.find_all('div', class_="ie9Style")
+
+        def while_req(url):
+            sub_is_ok, sub_search_resp = api_get(url=url,
+                                     headers=self.headers,
+                                     data={},
+                                     resptype='text')
+            return sub_is_ok, sub_search_resp
+
+        # 添加手动验证功能
+        if not detail_div:
+            while 1:
+                if is_ok and detail_div:
+                    break
+                else:
+                    LOG.critical('验证############### %s ###############' % comp_url)
+                    random_sleep(20, 25)
+                    is_ok, search_resp = while_req(comp_url)
+                    soup = BeautifulSoup(search_resp, 'lxml')
+                    detail_div = soup.find_all('div', class_="ie9Style")
+
+        # 0 企业缩略图 1 基础信息 2 下载
+        for index, div in enumerate(detail_div[1].find_all('div', recursive=False)):
+            if not div:
+                continue
+
+            # 电话 && 邮箱
+            if index == 1:
+                for big_index, big_child in enumerate(div):
+                    if big_index == 0:
+                        for sub_index, child in enumerate(big_child.children):
+                            if sub_index == 1:
+                                detail_res['phone'] = child.get_text().strip() or '-'
+                    elif big_index == 1:
+                        for sub_index, child in enumerate(big_child.children):
+                            if sub_index == 1:
+                                detail_res['email'] = child.get_text().strip() or '-'
+            # 公司官网 && 地址
+            elif index == 2:
+                for big_index, big_child in enumerate(div):
+                    if big_index == 0:
+                        for sub_index, child in enumerate(big_child.children):
+                            if sub_index == 1:
+                                detail_res['company_url'] = child.get_text().strip() or '-'
+                    elif big_index == 1:
+                        for sub_index, child in enumerate(big_child.children):
+                            if sub_index == 1:
+                                detail_res['address'] = child.get_text().strip() or '-'
+                                break
+            # 简介
+            elif index == 3:
+                for big_index, big_child in enumerate(div):
+                    if big_index == 0:
+                        for sub_index, sub_child in enumerate(big_child):
+                            if sub_index ==1:
+                                resume = sub_child.string
+                                if resume:
+                                    resume = resume.strip()
+                                detail_res['resume'] = resume or '-'
+                                break
+                    break
+            else:
+                continue
+
+        # detail-list: 信用代码 公司类型 所属行业 营业期限 实缴资本 经营范围
+        detail_list_div = soup.find_all('div', class_='base0910')
+        if not detail_list_div:
+            return detail_res
+
+        for index_tr, tr in enumerate(detail_list_div[0].find_all('tr')):
+            if not tr:
+                continue
+
+            if index_tr == 1:
+                for index_td, td in enumerate(tr.find_all('td', recursive=False)):
+                    if index_td == 1:  # 信用代码
+                        detail_res['credit_code'] = td.get_text().strip() or '-'
+                    elif index_td == 3:  # 公司类型
+                        detail_res['company_type'] = td.get_text().strip() or '-'
+            elif index_tr == 2:
+                for index_td, td in enumerate(tr.find_all('td', recursive=False)):
+                    if index_td == 3:  # 所属行业
+                        detail_res['industry'] = td.get_text().strip() or '-'
+            elif index_tr == 3:
+                for index_td, td in enumerate(tr.find_all('td', recursive=False)):
+                    if index_td == 1:  # 营业期限
+                        detail_res['business_term'] = td.get_text().strip() or '-'
+            elif index_tr == 4:
+                for index_td, td in enumerate(tr.find_all('td', recursive=False)):
+                    if index_td == 3:  # 实缴资本
+                        detail_res['paidin_funds'] = td.get_text().strip() or '-'
+            elif index_tr == 8:
+                for index_td, td in enumerate(tr.find_all('td', recursive=False)):
+                    if index_td == 1:  # 经营范围
+                        detail_res['business_scope'] = td.get_text().strip() or '-'
+
+        # detail-list: 注册资金 注册日期 经营状态
+        detail_list_div_1 = soup.find_all('div', class_='baseInfo_model2017')
+        if not detail_list_div:
+            return detail_res
+
+        for index_table, table in enumerate(detail_list_div_1[0].find_all('table')):
+            if not table:
+                continue
+
+            if index_table == 1:
+                for index_tr, tr in enumerate(table.find_all('tr')):
+                    if index_tr == 1:
+                        for index_td, td in enumerate(tr.find_all('td', recursive=False)):
+                            if index_td == 1:
+                                for index_td_span, td_span in enumerate(td.find_all('span')):
+                                    if index_td_span == 1:
+                                        detail_res['register_funds'] = td_span.get_text().strip() or '-'
+                    elif index_tr == 2:
+                        for index_td, td in enumerate(tr.find_all('td', recursive=False)):
+                            if index_td == 0:
+                                for index_td_span, td_span in enumerate(td.find_all('span')):
+                                    if index_td_span == 1:
+                                        detail_res['establish_date'] = td_span.get_text().strip() or '-'
+                    elif index_tr == 3:
+                        for index_td, td in enumerate(tr.find_all('td', recursive=False)):
+                            if index_td == 0:
+                                for index_td_div, td_div in enumerate(td.find_all('div', recursive=False)):
+                                    if index_td_div == 0:
+                                        for index_td_div_span, td_div_span in enumerate(td_div.find_all('span', recursive=False)):
+                                            if index_td_div_span == 1:
+                                                detail_res['status'] = td_div_span.get_text().strip() or '-'
 
         return detail_res

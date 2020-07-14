@@ -12,6 +12,7 @@
 > ### 项目运行
 
 - Centos7.0系统服务器
+- 不需要数据库存储数据的可以忽略此步，安装Mysql/MariaDB，创建数据库并配置，最后执行db目录下的sql文件（table create sql）
 - git clone https://github.com/GIS90/spider_tycweb_enterprise.git
 - 更新web配置文件：etc/config.py，根据不同需求进行项目更改
 - 安装项目运行的环境：python install_env.py，建立项目独立的运行环境，安装了virtualenv、python、packages等操作，了解具体详情请参考代码
@@ -27,7 +28,7 @@ RUN_MODE（运行模式）项目可采用不同的模式进行数据抓取，包
 - DB: 数据库连接，项目中包含数据库信息（请勿乱更改或者操作数据库）
 - FILES: 文件输出位置，如果无默认会在项目root目录下建立excel文件夹进行数据存放
 - STORE: 输出方式，excel与db
-- APIS: 天眼查的APIS
+- APIS: 天眼查的APIS，模式API_MODE: pro专业版 tyc普通版，默认tyc普通版，不同版本请求服务地址不同
 - PROXY: 代理相关的API，如果无代理API接口，IS_RUN设置False
 
 > ### 问题
