@@ -67,6 +67,12 @@ VERSION = '1.0.0'
 DEBUG = True
 KEYS = None
 RUN_MODE = 'single'
+IS_TEST_BREAK = False
+
+# pagination
+PAGINATION = 10
+MIN_PAGE = None
+MAX_PAGE = None
 
 # DB(sqlalchemy)，default is mysql
 DB_LINK = None
@@ -119,8 +125,17 @@ with open(_config_file) as f:
     if not KEYS:
         logger.critical('====== config KEYS is not allow NULL... ======')
         sys.exit(1)
-    KEYS = KEYS.split(',')
+    if KEYS.find('，'):
+        logger.critical('====== config KEYS split is english symbol ","... ======')
+        sys.exit(1)
+    KEYS = KEYS.strip().split(',')
     RUN_MODE = _config_info['SERVER']['RUN_MODE'] or RUN_MODE
+    IS_TEST_BREAK = _config_info['SERVER']['IS_TEST_BREAK'] or IS_TEST_BREAK
+
+    # PAGINATION
+    PAGINATION = _config_info['PAGINATION']['PAGINATION'] or PAGINATION
+    MIN_PAGE = _config_info['PAGINATION']['MIN_PAGE'] or MIN_PAGE
+    MAX_PAGE = _config_info['PAGINATION']['MAX_PAGE'] or MAX_PAGE
 
     # DB(sqlalchemy)，default is mysql
     DB_LINK = _config_info['DB']['DB_LINK'] or DB_LINK

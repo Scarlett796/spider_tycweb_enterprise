@@ -59,9 +59,10 @@ def api_post(url, headers={}, data={},
                      headers=headers,
                      data=data,
                      retry=retry + 1,
-                     resptype='json')
+                     resptype=resptype)
         else:
-            raise Exception('http api_post error: %s' % e)
+            LOG.error(u'@@@@@ %s api_post error: %s' % (url, e))
+            return False, []
     else:
         respcode = response.status_code
         if respcode != 200:
@@ -105,9 +106,10 @@ def api_get(url,  headers={}, data={},
     except Exception as e:
         if retry <= 3:
             random_sleep(1, 1.5)
-            api_get(url, headers, data, retry=retry + 1, resptype='json')
+            api_get(url, headers, data, retry=retry + 1, resptype=resptype)
         else:
-            raise Exception(u'api_get error: %s' % e)
+            LOG.error(u'@@@@@ %s api_get error: %s' % (url, e))
+            return False, []
     else:
         respcode = response.status_code
         # print(respcode, response.content)

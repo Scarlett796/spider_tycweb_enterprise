@@ -2,8 +2,15 @@ SERVER:
   NAME: Spider_TYC_Enterprise
   VERSION: 1.0.0
   DEBUG: True
-  KEYS: 环保设备
+  KEYS: 环保设备,化工设备,涂料设备,管道安装,保温管道,通风设备
   RUN_MODE: process  # single单进程 process多进程 gevent多协程
+  IS_TEST_BREAK: False
+
+
+PAGINATION:
+  MIN_PAGE: 80
+  MAX_PAGE:
+  PAGINATION: 10
 
 
 LOG:

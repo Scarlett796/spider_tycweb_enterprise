@@ -49,3 +49,4 @@ class EnterpriseModel(base.ModelBase):
     business_term = Column(String(55))
     resume = Column(TEXT())
     business_scope = Column(TEXT())
+    key = Column(String(55))

@@ -22,7 +22,8 @@ import sys
 
 from deploy.config import NAME, VERSION, KEYS, DEBUG,\
     STORE_DB, STORE_EXCEL, OUTPUT_BASE_DIR, RUN_MODE, \
-    STORE_EXCEL, API_MODE
+    STORE_EXCEL, API_MODE, PAGINATION, IS_TEST_BREAK,\
+    MIN_PAGE, MAX_PAGE
 from deploy.utils.logger import logger as LOG
 from deploy.utils.base_class import BASECLASS
 from deploy.client.tianyancha import TianYanChaClient
@@ -43,6 +44,7 @@ MAX_CPU = multiprocessing.cpu_count()
 
 
 MODES = ['single', 'gevent', 'process']
+
 ATTRS_DICT = {
     'name': "名称",
     'email': "邮箱",
@@ -60,6 +62,7 @@ ATTRS_DICT = {
     'business_term': "营业期限",
     'resume': "简述",
     'business_scope': "经营范围",
+    'key': "搜索关键字"
 }
 
 
@@ -97,46 +100,104 @@ class SpiderTYCClass(BASECLASS):
         LOG.info('=' * 20 + message + '=' * 20)
 
     def single_run(self):
+        """
+        single mode to run
+        :return: None
+        """
         for key in self.keys:
             if not key:
                 continue
 
-            self._print_info(key)
-            self.ret_res_list.extend(self.tyc_client.work_by_key(key))
+            min_page, max_pagination = self.tyc_client.get_pagination(key)
+            # page_count_max
+            if max_pagination // PAGINATION == 0:
+                page_count_max = 1
+            else:
+                if (max_pagination / PAGINATION) == max_pagination // PAGINATION:
+                    page_count_max =  max_pagination // PAGINATION
+                else:
+                    page_count_max =  max_pagination // PAGINATION + 1
+            if not MAX_PAGE:
+                page_count_max = page_count_max
+            else:
+                if MAX_PAGE / PAGINATION == MAX_PAGE // PAGINATION:
+                    page_count_max = MAX_PAGE // PAGINATION
+                else:
+                    page_count_max = MAX_PAGE // PAGINATION + 1
+            # page_count_min
+            if not MIN_PAGE:
+                page_count_min = 0
+            else:
+                if MIN_PAGE / PAGINATION == MIN_PAGE // PAGINATION:
+                    page_count_min = MIN_PAGE // PAGINATION
+                else:
+                    page_count_min = MIN_PAGE // PAGINATION + 1
+            for i in range(page_count_min, page_count_max, 1):
+                max_page = PAGINATION * i
+                if max_page > max_pagination:
+                    max_page = max_pagination
+                self._print_info('[%s][%s]%s ~ %s' % (RUN_MODE, key, min_page, max_page))
+                _res = self.tyc_client.work_by_key(key, min_page, max_page)
 
-        if STORE_EXCEL:
-            to_excel_name = os.path.join(get_excel_folder(),
-                                         '%s[%s]-%s.xls' % (get_now(), API_MODE, '_'.join(self.keys)))
-            self.excel_client.to_excel(self.ret_res_list, ATTRS_DICT,
-                                       to_excel_name)
-            LOG.info(to_excel_name)
-        if STORE_DB:
-            self.enterprise_service.adds(datas=self.ret_res_list)
-            LOG.info('DB is finished.......')
+                if STORE_EXCEL:
+                    to_excel_name = os.path.join(get_excel_folder(),
+                                                 '%s[%s]-%s[%s~%s].xls' %
+                                                 (get_now(), API_MODE, key, min_page, max_page))
+                    self.excel_client.to_excel(_res, ATTRS_DICT, to_excel_name)
+                    LOG.info(to_excel_name)
 
+                if STORE_DB:
+                    self.enterprise_service.adds(self.ret_res_list)
+                    LOG.info('DB is finished: %s[%s ~ %s]' % ('_'.join(key), min_page, max_page))
+
+                min_page = max_page + 1
 
     def process_run(self):
+        """
+        multiprocess mode to run
+        :return: None
+        """
+
+        manager = multiprocessing.Manager()
+        q = manager.Queue()
+
         pool = multiprocessing.Pool(processes=(MAX_CPU-1 if MAX_CPU > 2 else 1))
-        result = []
+        LOG.info('run cpu count: %s' % (MAX_CPU-1 if MAX_CPU > 2 else 1))
+        process = list()
+
         for key in self.keys:
             if not key:
                 continue
-            result.append(
-                pool.apply_async(self.tyc_client.work_by_key, args=(key, ))
+
+            min_page, max_page = self.tyc_client.get_pagination(key)
+            if MIN_PAGE:
+                min_page = MIN_PAGE
+            if MAX_PAGE:
+                max_page = MAX_PAGE
+            process.append(
+                pool.apply_async(self.tyc_client.work_by_key, args=(key, min_page, max_page, q))
             )
+
         pool.close()
         pool.join()
 
-        [self.ret_res_list.extend(x.get()) for x in result if x]
+        while 1:
+            try:
+                if q.empty():
+                    break
+                self.ret_res_list.append(q.get())
+            except:
+                continue
+
         if STORE_EXCEL:
             to_excel_name = os.path.join(get_excel_folder(),
-                                         '%s[%s]-%s.xls' % (get_now(), API_MODE, '_'.join(self.keys)))
-            self.excel_client.to_excel(self.ret_res_list, ATTRS_DICT,
-                                       to_excel_name)
+                                         '%s[%s]-%s[%s~%s].xls' %
+                                         (get_now(), API_MODE, '_'.join(self.keys), min_page, max_page))
+            self.excel_client.to_excel(self.ret_res_list, ATTRS_DICT, to_excel_name)
             LOG.info(to_excel_name)
         if STORE_DB:
-            self.enterprise_service.adds(datas=self.ret_res_list)
-            LOG.info('DB is finished.......')
+            self.enterprise_service.adds(self.ret_res_list)
+            LOG.info('DB is finished: %s' % '_'.join(self.keys))
 
     def gevent_run(self):
         jobs = list()
@@ -160,7 +221,7 @@ class SpiderTYCClass(BASECLASS):
 
 
 def start():
-    LOG.info('%s start run......' % NAME)
+    LOG.info('%s run start [IS TEST RUN: %s]......' % (NAME, IS_TEST_BREAK))
     SpiderTYCClass().init_run()
-    LOG.info('%s end run......' % NAME)
+    LOG.info('%s run end [IS TEST RUN: %s]......' % (NAME, IS_TEST_BREAK))
 

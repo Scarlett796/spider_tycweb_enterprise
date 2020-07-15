@@ -19,5 +19,6 @@ CREATE TABLE `enterprise`.`enterprise` (
 	`business_term` varchar(55) COMMENT '营业期限',
 	`resume` text COMMENT '简述',
 	`business_scope` text COMMENT '经营范围',
+	`key` varchar(55) COMMENT '搜索关键字',
 	PRIMARY KEY (`id`, `credit_code`)
 ) COMMENT='企业信息表';

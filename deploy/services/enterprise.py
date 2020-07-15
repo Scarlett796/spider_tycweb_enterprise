@@ -38,7 +38,8 @@ class EnterpriseService(object):
         'industry',
         'business_term',
         'resume',
-        'business_scope'
+        'business_scope',
+        'key'
     ]
 
     def __init__(self):
@@ -60,6 +61,8 @@ class EnterpriseService(object):
             if not data:
                 continue
 
+            if isinstance(data, str):
+                data = dict(data)
             credit_code = data.get('credit_code')
             name = data.get('name')
             model = self.enterprise_bo.get_by_code(credit_code)
@@ -84,6 +87,7 @@ class EnterpriseService(object):
             new_model.business_term = data.get('business_term')
             new_model.resume = data.get('resume')
             new_model.business_scope = data.get('business_scope')
+            new_model.key = data.get('key')
             try:
                 self.enterprise_bo.add_model(new_model)
                 success_list.append(name)
@@ -91,6 +95,8 @@ class EnterpriseService(object):
                 LOG.error(data)
                 failure_list.append(name)
         else:
-            print('success list【%s】:%s' % (len(success_list), ','.join(success_list)))
-            print('failure list【%s】:%s' % (len(failure_list), ','.join(failure_list)))
+            if success_list:
+                print('success list:【%s】' % len(success_list))
+            if failure_list:
+                print('failure list:【%s】' % len(failure_list))
             return success_list, failure_list

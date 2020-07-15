@@ -22,11 +22,12 @@ from urllib import parse
 from bs4 import BeautifulSoup
 
 from deploy.config import RUN_MODE, API_MODE, TYC_COOKIE, \
-    TYC_SEARCH_API, TYC_DETAIL_API, \
-    TYC_PRO_SEARCH_API, TYC_PRO_DETAIL_API
+    TYC_SEARCH_API, \
+    TYC_PRO_SEARCH_API, TYC_PRO_DETAIL_API, IS_TEST_BREAK
 from deploy.utils.http import api_get
 from deploy.utils.logger import logger as LOG
 from deploy.utils.utils import random_sleep
+
 
 
 class TianYanChaClient(object):
@@ -34,14 +35,11 @@ class TianYanChaClient(object):
     tianyancha client
     """
 
-    def __init__(self):
+    def __init__(self, min_page=0, max_page=5):
         super(object, self).__init__()
-        self.MAX_PAGE = self._init_max_page()
-        self.MIN_PAGE = 0
+        self.MAX_PAGE = max_page
+        self.MIN_PAGE = min_page
         self._init_header()
-
-    def _init_max_page(self):
-        return 10
 
     def _init_header(self):
         if API_MODE == 'tyc':
@@ -59,22 +57,77 @@ class TianYanChaClient(object):
             "Sec-Fetch-Dest": "document"
         }
 
-    def work_by_key(self, key):
+    def get_pagination(self, key):
+        min_page = 0
+        max_page = 5
+        if not key:
+            return min_page, max_page
+
+        if API_MODE == 'tyc':
+            return min_page, max_page
+        elif API_MODE == 'pro':
+            url = '%s/p%s?key=%s' % (TYC_PRO_SEARCH_API, '0', parse.quote(key))
+            is_ok, search_resp = api_get(url=url,
+                                         headers=self.headers,
+                                         data={},
+                                         resptype='text')
+
+            soup = BeautifulSoup(search_resp, 'lxml')
+            search_pagination = soup.find_all('div', class_='search-pagination')
+
+            def while_req(url):
+                sub_is_ok, sub_search_resp = api_get(url=url,
+                                         headers=self.headers,
+                                         data={},
+                                         resptype='text')
+                return sub_is_ok, sub_search_resp
+
+            # 添加手动验证功能
+            if len(search_pagination) == 0 or not is_ok:
+                while 1:
+                    if is_ok and len(search_pagination) > 0:
+                        break
+                    else:
+                        LOG.critical('验证############### %s ###############' % url)
+                        random_sleep(20,25)
+                        is_ok, search_resp = while_req(url)
+                        soup = BeautifulSoup(search_resp, 'lxml')
+                        search_pagination = soup.find_all('div', class_='search-pagination')
+
+            l = len(search_pagination[0].find_all('a'))
+            for index_a, a in enumerate(search_pagination[0].find_all('a')):
+                if index_a == (l - 2):
+                    max_page = a.string.strip()
+                    if max_page.find('...') > -1:
+                        max_page = max_page.split('...')[1]
+                        if isinstance(max_page, str):
+                            max_page = int(max_page)
+                    break
+            LOG.info('[%s] pagination max: %s' % (key, max_page))
+            return min_page, max_page
+
+    def work_by_key(self, key, min_page=0, max_page=5, queue=None):
         ret_res = list()
         if not key:
             LOG.error("【%s】key is null, no work." % RUN_MODE)
             return ret_res
 
+        if not min_page:
+            min_page = self.MIN_PAGE
+        if not max_page:
+            max_page = self.MAX_PAGE
+
+        LOG.info('%s[%s ~ %s]' % (key, min_page, max_page))
         # page
-        for page in range(self.MIN_PAGE, self.MAX_PAGE, 1):
+        for page in range(min_page, max_page, 1):
             if API_MODE == 'tyc':
                 url = '%s/p%s?key=%s' % (TYC_SEARCH_API, page, parse.quote(key))
             elif API_MODE == 'pro':
-                 url = '%s/p%s?key=%s' % (TYC_PRO_SEARCH_API, page, parse.quote(key))
+                url = '%s/p%s?key=%s' % (TYC_PRO_SEARCH_API, page, parse.quote(key))
             else:
                 LOG.critical('====== API_MODE is not in [tyc, pro] ======')
                 sys.exit(1)
-            print(url)
+            LOG.info('%s[%s]%s' % (key, API_MODE, url))
 
             is_ok, search_resp = api_get(url=url,
                                          headers=self.headers,
@@ -119,17 +172,22 @@ class TianYanChaClient(object):
                     tyc_url = ''
                 res_dict['tyc_url'] = tyc_url
                 res_dict['name'] = tag.get_text().strip()
+                res_dict['key'] = key
                 detail_res = list()
                 if API_MODE == 'tyc':
                     detail_res = self.detail_by_url(res_dict.get('tyc_url'))
                 elif API_MODE == 'pro':
                     detail_res = self.detail_pro_by_url(res_dict.get('tyc_url'))
                 res_dict.update(detail_res)
-                print(res_dict['name'], res_dict['tyc_url'], str(True if res_dict else False))
+                print('%s[%s] %s' % (res_dict['name'], str(True if res_dict else False), res_dict['tyc_url']))
                 ret_res.append(res_dict)
-                random_sleep(3, 4.5)
-            #     break
-            # break
+                if queue:
+                    queue.put(res_dict)
+                random_sleep(3.2, 4.5)
+                if IS_TEST_BREAK:
+                    break
+            if IS_TEST_BREAK:
+                break
         return ret_res
 
     def detail_by_url(self, comp_url: str):
@@ -279,6 +337,8 @@ class TianYanChaClient(object):
                                      data={},
                                      resptype='text')
         if not is_ok:
+            print('X-' * 100)
+            print(comp_url)
             return detail_res
 
         soup = BeautifulSoup(search_resp, 'lxml')

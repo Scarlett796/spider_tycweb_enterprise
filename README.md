@@ -23,7 +23,12 @@
 位置：etc/config.yaml
 - SERVER: 服务基础信息
 其中，KEYS为查询关键字，可以设置多个，建议3 ～ 6个，并且用英文逗号","进行分割
-RUN_MODE（运行模式）项目可采用不同的模式进行数据抓取，包含3种模式：single单进程 process多进程 gevent多协程
+RUN_MODE（运行模式）项目可采用不同的模式进行数据抓取，包含3种模式：single单进程 process多进程 gevent多协程，使用process模式时，建议关键字的个数 < CPU-1
+IS_TEST_BREAK是否开启测试模式，测试模式是只获取每页的一条数据
+- PAGINATION
+PAGINATION为page的分割数，用于single模式，到达指定的分割数为一个分割excel文件
+MIN_PAGE最小页数
+MAX_PAGE最大页数
 - LOG: 日志，如果无LOG_DIR默认会在项目root目录下建立log文件夹进行日志存放
 - DB: 数据库连接，项目中包含数据库信息（请勿乱更改或者操作数据库）
 - FILES: 文件输出位置，如果无默认会在项目root目录下建立excel文件夹进行数据存放
@@ -34,23 +39,33 @@ RUN_MODE（运行模式）项目可采用不同的模式进行数据抓取，包
 > ### 问题
 
 1、需要在etc/config.yaml进行配置相关信息，cookie建议填写，否则爬取的数据电话、邮箱等信息是带有**号的。
+
 2、未注册的用户只能查找遍历5页，目前这个没什么好的方案解决。
+
 3、需要手动进行验证码验证
 
 > ### 已完善功能
 
 - 数据爬取、解析、excel/DB存储
 - 多进程模式运行
+- 支持普通版（www.tianyancha.com）、专业版（pro.tianyancha.com）
+- 支持请求代理，需要配置指定代理API
 
 > ### 开发中功能
 
 1、解决手动验证的问题
+
 2、多协程数据抓取，协程gevent安装出现问题（Mac）
 
 
+> ### 结果说明
+
+- 7个进程跑数据，1w条数据大概2.5h（本人亲测）
+
 > ### 特别声明
 
-项目部分代码借鉴了我的web脚手架代码（https://github.com/GIS90/base_webframe）
+- 项目部分代码借鉴了我的web脚手架代码（https://github.com/GIS90/base_webframe）
+- 在请求获取详情数据时候，设置time.sleep，以免反爬机制认为是恶意爬取
 
 
 > ### 联系方式
