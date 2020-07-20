@@ -54,7 +54,7 @@ def api_post(url, headers={}, data={},
                                      data=data, timeout=5, proxies=proxies)
     except Exception as e:
         if retry <= 3:
-            random_sleep(1, 1.5)
+            random_sleep(7, 7.5)
             api_post(url=url,
                      headers=headers,
                      data=data,
@@ -105,7 +105,7 @@ def api_get(url,  headers={}, data={},
                                     data=data, timeout=5, proxies=proxies)
     except Exception as e:
         if retry <= 3:
-            random_sleep(1, 1.5)
+            random_sleep(7, 10)
             api_get(url, headers, data, retry=retry + 1, resptype=resptype)
         else:
             LOG.error(u'@@@@@ %s api_get error: %s' % (url, e))

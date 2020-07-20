@@ -58,8 +58,8 @@ class TianYanChaClient(object):
         }
 
     def get_pagination(self, key):
-        min_page = 0
-        max_page = 5
+        min_page = self.MIN_PAGE
+        max_page = self.MAX_PAGE
         if not key:
             return min_page, max_page
 
@@ -106,20 +106,15 @@ class TianYanChaClient(object):
             LOG.info('[%s] pagination max: %s' % (key, max_page))
             return min_page, max_page
 
-    def work_by_key(self, key, min_page=0, max_page=5, queue=None):
+    def work_by_key(self, key, min_page, max_page, queue=None):
         ret_res = list()
         if not key:
             LOG.error("【%s】key is null, no work." % RUN_MODE)
             return ret_res
 
-        if not min_page:
-            min_page = self.MIN_PAGE
-        if not max_page:
-            max_page = self.MAX_PAGE
-
-        LOG.info('%s[%s ~ %s]' % (key, min_page, max_page))
+        LOG.info('[%s]run page: %s ~ %s' % (key, min_page, max_page))
         # page
-        for page in range(min_page, max_page, 1):
+        for page in range(min_page, max_page + 1, 1):
             if API_MODE == 'tyc':
                 url = '%s/p%s?key=%s' % (TYC_SEARCH_API, page, parse.quote(key))
             elif API_MODE == 'pro':

@@ -87,7 +87,7 @@ LOG_FILENAME_PREFIX = 'spider_tyc_enterprise'
 OUTPUT_BASE_DIR = __get_excel_dir()
 
 # store
-STORE_EXCEL = True
+STORE_EXCEL = False
 STORE_DB = False
 
 # apis
@@ -125,7 +125,7 @@ with open(_config_file) as f:
     if not KEYS:
         logger.critical('====== config KEYS is not allow NULL... ======')
         sys.exit(1)
-    if KEYS.find('，'):
+    if KEYS.find('，') > -1:
         logger.critical('====== config KEYS split is english symbol ","... ======')
         sys.exit(1)
     KEYS = KEYS.strip().split(',')

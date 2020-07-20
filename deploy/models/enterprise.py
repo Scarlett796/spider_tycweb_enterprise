@@ -50,3 +50,4 @@ class EnterpriseModel(base.ModelBase):
     resume = Column(TEXT())
     business_scope = Column(TEXT())
     key = Column(String(55))
+    create_time = Column(TIMESTAMP)

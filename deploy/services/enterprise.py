@@ -17,6 +17,7 @@ base_info:
 """
 from deploy.bo.enterprise import EnterpriseBo
 from deploy.utils.logger import logger as LOG
+from deploy.utils.utils import get_now
 
 
 class EnterpriseService(object):
@@ -65,6 +66,9 @@ class EnterpriseService(object):
                 data = dict(data)
             credit_code = data.get('credit_code')
             name = data.get('name')
+            if not credit_code:
+                failure_list.append(name)
+                continue
             model = self.enterprise_bo.get_by_code(credit_code)
             if model:
                 failure_list.append(name)
@@ -88,15 +92,16 @@ class EnterpriseService(object):
             new_model.resume = data.get('resume')
             new_model.business_scope = data.get('business_scope')
             new_model.key = data.get('key')
+            new_model.create_time = get_now()
             try:
                 self.enterprise_bo.add_model(new_model)
                 success_list.append(name)
-            except:
-                LOG.error(data)
+            except Exception as e:
+                LOG.error('DB add error %s: %s' % (e, str(data)))
                 failure_list.append(name)
         else:
             if success_list:
-                print('success list:【%s】' % len(success_list))
+                LOG.info('success list:【%s】' % len(success_list))
             if failure_list:
-                print('failure list:【%s】' % len(failure_list))
+                LOG.info('failure list:【%s】' % len(failure_list))
             return success_list, failure_list

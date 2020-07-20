@@ -108,32 +108,28 @@ class SpiderTYCClass(BASECLASS):
             if not key:
                 continue
 
-            min_page, max_pagination = self.tyc_client.get_pagination(key)
-            # page_count_max
-            if max_pagination // PAGINATION == 0:
-                page_count_max = 1
+            min_page, max_page = self.tyc_client.get_pagination(key)
+            max_pagination = max_page
+            if MIN_PAGE:
+                min_page = int(MIN_PAGE)
+            if MAX_PAGE:
+                max_page = int(MAX_PAGE)
+
+            if min_page == max_page:
+                max_range = 1
+            elif min_page > max_page:
+                LOG.critical('Page min and max is error: min[%s] max[%s]' % (min_page, max_page))
+                sys.exit()
             else:
-                if (max_pagination / PAGINATION) == max_pagination // PAGINATION:
-                    page_count_max =  max_pagination // PAGINATION
+                if (max_page - min_page) / PAGINATION == (max_page - min_page) // PAGINATION:
+                    max_range = (max_page - min_page) // PAGINATION
                 else:
-                    page_count_max =  max_pagination // PAGINATION + 1
-            if not MAX_PAGE:
-                page_count_max = page_count_max
-            else:
-                if MAX_PAGE / PAGINATION == MAX_PAGE // PAGINATION:
-                    page_count_max = MAX_PAGE // PAGINATION
-                else:
-                    page_count_max = MAX_PAGE // PAGINATION + 1
-            # page_count_min
-            if not MIN_PAGE:
-                page_count_min = 0
-            else:
-                if MIN_PAGE / PAGINATION == MIN_PAGE // PAGINATION:
-                    page_count_min = MIN_PAGE // PAGINATION
-                else:
-                    page_count_min = MIN_PAGE // PAGINATION + 1
-            for i in range(page_count_min, page_count_max, 1):
-                max_page = PAGINATION * i
+                    max_range = (max_page - min_page) // PAGINATION + 1
+
+            LOG.info('[%s]sum page: %s ~ %s' % (key, min_page, max_page))
+
+            for i in range(0, max_range, 1):
+                max_page = PAGINATION + min_page
                 if max_page > max_pagination:
                     max_page = max_pagination
                 self._print_info('[%s][%s]%s ~ %s' % (RUN_MODE, key, min_page, max_page))
@@ -162,7 +158,7 @@ class SpiderTYCClass(BASECLASS):
         q = manager.Queue()
 
         pool = multiprocessing.Pool(processes=(MAX_CPU-1 if MAX_CPU > 2 else 1))
-        LOG.info('run cpu count: %s' % (MAX_CPU-1 if MAX_CPU > 2 else 1))
+        LOG.info('Main process: %s, run cpu count: %s' % (os.getpid(), (MAX_CPU-1 if MAX_CPU > 2 else 1)))
         process = list()
 
         for key in self.keys:
@@ -171,12 +167,32 @@ class SpiderTYCClass(BASECLASS):
 
             min_page, max_page = self.tyc_client.get_pagination(key)
             if MIN_PAGE:
-                min_page = MIN_PAGE
+                min_page = int(MIN_PAGE)
             if MAX_PAGE:
-                max_page = MAX_PAGE
-            process.append(
-                pool.apply_async(self.tyc_client.work_by_key, args=(key, min_page, max_page, q))
-            )
+                max_page = int(MAX_PAGE)
+
+            min_pagination, max_pagination = min_page, max_page
+
+            if min_page == max_page:
+                max_range = 1
+            elif min_page > max_page:
+                LOG.critical('Page min and max is error: min[%s] max[%s]' % (min_page, max_page))
+                sys.exit()
+            else:
+                if (max_page - min_page) / PAGINATION == (max_page - min_page) // PAGINATION:
+                    max_range = (max_page - min_page) // PAGINATION
+                else:
+                    max_range = (max_page - min_page) // PAGINATION + 1
+
+            LOG.info('[%s][%s]sum page: %s ~ %s' % (RUN_MODE, key, min_page, max_page))
+            for i in range(0, max_range, 1):
+                max_page = min_page + PAGINATION
+                if max_page > max_pagination:
+                    max_page =  max_pagination
+                process.append(
+                    pool.apply_async(self.tyc_client.work_by_key, args=(key, min_page, max_page, q))
+                )
+                min_page = max_page + 1
 
         pool.close()
         pool.join()
@@ -185,27 +201,29 @@ class SpiderTYCClass(BASECLASS):
             try:
                 if q.empty():
                     break
-                self.ret_res_list.append(q.get())
+                self.ret_res_list.append(q.get_nowait())
             except:
-                continue
+                pass
 
         if STORE_EXCEL:
             to_excel_name = os.path.join(get_excel_folder(),
                                          '%s[%s]-%s[%s~%s].xls' %
-                                         (get_now(), API_MODE, '_'.join(self.keys), min_page, max_page))
+                                         (get_now(), API_MODE, '_'.join(self.keys), min_pagination, max_pagination))
             self.excel_client.to_excel(self.ret_res_list, ATTRS_DICT, to_excel_name)
             LOG.info(to_excel_name)
         if STORE_DB:
             self.enterprise_service.adds(self.ret_res_list)
-            LOG.info('DB is finished: %s' % '_'.join(self.keys))
+            LOG.info('DB is finished[%s ~ %s]: %s' % (min_pagination, max_pagination, '_'.join(self.keys)))
 
     def gevent_run(self):
         jobs = list()
         for key in self.keys:
             if not key:
                 continue
-        #     jobs.append(gevent.spawn(self.tyc_client.work_by_key, args=(key, ))
+        #     jobs.append(gevent.spawn(self.tyc_client.work_by_key, args=(key, 0, 10)))
         # gevent.joinall(jobs)
+        # for job in jobs:
+        #     print(job)
 
     def init_run(self):
         if not RUN_MODE or RUN_MODE not in MODES:

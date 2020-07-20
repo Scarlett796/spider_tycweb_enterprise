@@ -26,9 +26,9 @@
 RUN_MODE（运行模式）项目可采用不同的模式进行数据抓取，包含3种模式：single单进程 process多进程 gevent多协程，使用process模式时，建议关键字的个数 < CPU-1
 IS_TEST_BREAK是否开启测试模式，测试模式是只获取每页的一条数据
 - PAGINATION
-PAGINATION为page的分割数，用于single模式，到达指定的分割数为一个分割excel文件
-MIN_PAGE最小页数
-MAX_PAGE最大页数
+PAGINATION为page的分割数，到达指定的分割数为一个分割excel文件，主要目的是避免获取数据获取过程中失败导致重新运行
+如果发生失败，只需要配置MIN_PAGE（最小页数）、MAX_PAGE（最大页数），程序运行会从MIN_PAGE获取到MAX_PAGE
+PAGINATION建议为10的整倍数（10、20），程序默认为10
 - LOG: 日志，如果无LOG_DIR默认会在项目root目录下建立log文件夹进行日志存放
 - DB: 数据库连接，项目中包含数据库信息（请勿乱更改或者操作数据库）
 - FILES: 文件输出位置，如果无默认会在项目root目录下建立excel文件夹进行数据存放
