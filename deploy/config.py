@@ -172,16 +172,15 @@ with open(_config_file) as f:
     IS_PLUS_CITY = _config_info['APIS']['IS_PLUS_CITY'] or IS_PLUS_CITY
     IS_PLUS_CITY_SUB = _config_info['APIS']['IS_PLUS_CITY_SUB'] or IS_PLUS_CITY_SUB
     PLUS_CITYS = _config_info['APIS']['PLUS_CITYS'] or PLUS_CITYS
-    if IS_PLUS_CITY:
-        if not PLUS_CITYS:
-            logger.error('Please config search city, use english "," to split.')
-            sys.exit(1)
-        if isinstance(PLUS_CITYS, int):
-            PLUS_CITYS = str(PLUS_CITYS)
-        if PLUS_CITYS.find('，') > -1:
-            logger.critical('====== config PLUS_CITYS split is english symbol ","... ======')
-            sys.exit(1)
-        PLUS_CITYS = PLUS_CITYS.strip().split(',')
+    if not PLUS_CITYS:
+        logger.error('Please config search city, use english "," to split.')
+        sys.exit(1)
+    if isinstance(PLUS_CITYS, int):
+        PLUS_CITYS = str(PLUS_CITYS)
+    if PLUS_CITYS.find('，') > -1:
+        logger.critical('====== config PLUS_CITYS split is english symbol ","... ======')
+        sys.exit(1)
+    PLUS_CITYS = PLUS_CITYS.strip().split(',')
 
     # proxy
     PROXY_API = _config_info['PROXY']['API'] or PROXY_API

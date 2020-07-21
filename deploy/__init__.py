@@ -69,6 +69,9 @@ CITYS_ATTRS_LIST = ['id', 'name', 'full_name', 'code', 'is_cg']
 
 NO_SUB_CITYS = [33, 34, 35, '33', '34', '35']
 
+MIN_CITY_ID = 1
+MAX_CITY_ID = 35
+
 
 class SpiderTYCClass(BASECLASS):
     """
@@ -92,6 +95,7 @@ class SpiderTYCClass(BASECLASS):
         self.citys_service = CitysService()
         self.citys_dict = dict()
         self.sub_citys_dict = dict()
+        self.sub_citys_mapping = dict()
         self.NO_SUB_CITYS = self.__init_no_sub_citys()
         self.__init_return_res()
         self.__init_citys()
@@ -100,50 +104,48 @@ class SpiderTYCClass(BASECLASS):
         self.ret_res_list = list()
 
     def __init_citys(self):
+        # 省份
         citys = dict()
-        if IS_PLUS_CITY:
-            for x in PLUS_CITYS:
-                if not x:
-                    continue
-                if isinstance(x, str):
-                    x = int(x)
-                city_info = self.citys_service.get_by_id(x)
-                if not city_info:
+        for x in range(MIN_CITY_ID, MAX_CITY_ID + 1, 1):
+            city_info = self.citys_service.get_by_id(x)
+            if not city_info:
+                continue
+            d = dict()
+            d['id'] = city_info.id
+            d['name'] = city_info.name
+            d['full_name'] = city_info.full_name
+            d['parent_id'] = city_info.parent_id
+            d['code'] = city_info.code
+            d['is_cg'] = city_info.is_cg
+            citys[x] = d
+        self.citys_list = citys
+        # 市
+        sub_citys_map = dict()
+        sub_citys = dict()
+        for x in range(MIN_CITY_ID, MAX_CITY_ID + 1, 1):
+            city_info = self.citys_service.get_by_id(x)
+            if not city_info:
+                continue
+            sub_objs = self.citys_service.get_subobj_by_parid(x)
+            if not sub_objs:
+                continue
+
+            dl = list()
+            for sub_obj in sub_objs:
+                if not sub_obj:
                     continue
                 d = dict()
-                d['id'] = city_info.id
-                d['name'] = city_info.name
-                d['full_name'] = city_info.full_name
-                d['parent_id'] = city_info.parent_id
-                d['code'] = city_info.code
-                d['is_cg'] = city_info.is_cg
-                citys[x] = d
-            self.citys_list = citys
-        sub_citys = dict()
-        if IS_PLUS_CITY_SUB:
-            for x in PLUS_CITYS:
-                if not x:
-                    continue
-                if isinstance(x, str):
-                    x = int(x)
-                sub_objs = self.citys_service.get_subobj_by_parid(x)
-                if not sub_objs:
-                    continue
-
-                dl = list()
-                for sub_obj in sub_objs:
-                    if not sub_obj:
-                        continue
-                    d = dict()
-                    d['id'] = sub_obj.id
-                    d['name'] = sub_obj.name
-                    d['full_name'] = sub_obj.full_name
-                    d['parent_id'] = sub_obj.parent_id
-                    d['code'] = sub_obj.code
-                    d['is_cg'] = sub_obj.is_cg
-                    dl.append(d)
-                sub_citys[x] = dl
-            self.sub_citys_dict = sub_citys
+                d['id'] = sub_obj.id
+                d['name'] = sub_obj.name
+                d['full_name'] = sub_obj.full_name
+                d['parent_id'] = sub_obj.parent_id
+                d['code'] = sub_obj.code
+                d['is_cg'] = sub_obj.is_cg
+                dl.append(d)
+                sub_citys[d.get('id')] = d
+            sub_citys_map[x] = dl
+        self.sub_citys_mapping = sub_citys_map
+        self.sub_citys_dict = sub_citys
 
     def __init_no_sub_citys(self):
         return self.citys_service.get_no_sub_citys()
@@ -251,7 +253,7 @@ class SpiderTYCClass(BASECLASS):
                     sys.exit(1)
 
                 city_full_name = city_info.get('full_name')
-                sub_city_infos = self.sub_citys_dict.get(cid)
+                sub_city_infos = self.sub_citys_mapping.get(cid)
 
                 if not sub_city_infos:
                     LOG.info('%s is not have sub_city_infos, exit...' % cid)
@@ -297,6 +299,65 @@ class SpiderTYCClass(BASECLASS):
 
                         min_page = max_page + 1
 
+    def _single_by_key_only_sub_city(self):
+
+        for key in self.keys:
+            if not key:
+                continue
+
+            for sub_cid in PLUS_CITYS:
+                if not sub_cid:
+                    continue
+                if not isinstance(sub_cid, int):
+                    sub_cid = int(sub_cid)
+
+                sub_city_info = self.sub_citys_dict.get(sub_cid)
+                if not sub_city_info:
+                    LOG.info('@@@@@: %s is not have sub_city information, exit...' % sub_cid)
+                    sys.exit(1)
+                sub_city_pid = sub_city_info.get('parent_id')
+                city_info = self.citys_list.get(sub_city_pid)
+                if not city_info:
+                    LOG.info('@@@@@: %s is not have parent city information, exit...' % sub_cid)
+                    sys.exit(1)
+
+                city_id = city_info.get('id')
+                city_full_name = city_info.get('full_name')
+                sub_city_id = sub_city_info.get('id')
+                sub_city_full_name = sub_city_info.get('full_name')
+                min_page, max_page, max_pagination, max_range = self.tyc_client.get_pagination(key, _type='sub_city',
+                                                                                               city_id=city_id,
+                                                                                               sub_city_id=sub_city_id,
+                                                                                               cityes=self.citys_list,
+                                                                                               sub_city_info=sub_city_info)
+                max_pagination = int(max_pagination)
+                LOG.info('[%s][%s][%s-%s]spider page: %s ~ %s ||| max_pagination: %s ||| max range: %s'
+                         % (RUN_MODE, key, city_full_name, sub_city_full_name, min_page, max_page, max_pagination, max_range))
+                if not max_range:
+                    LOG.error("It's not have max range")
+                    sys.exit()
+
+                for i in range(0, max_range, 1):
+                    max_page = PAGINATION + min_page
+                    if max_page > max_pagination:
+                        max_page = max_pagination
+                    self._print_info('[%s][%s][%s]%s ~ %s' % (RUN_MODE, key, city_full_name, min_page, max_page))
+                    _res = self.tyc_client.work_by_key(key, min_page, max_page, cid=city_id, sub_cid=sub_city_id,
+                                                       city_info=city_info, sub_city_info=sub_city_info)
+
+                    if STORE_EXCEL:
+                        to_excel_name = os.path.join(get_excel_folder(),
+                                                     '%s[%s]-%s[%s-%s][%s~%s].xls' %
+                                                     (get_now(), API_MODE, key, city_full_name, sub_city_full_name, min_page, max_page))
+                        self.excel_client.to_excel(_res, ATTRS_DICT, to_excel_name)
+                        LOG.info(to_excel_name)
+
+                    if STORE_DB:
+                        self.enterprise_service.adds(self.ret_res_list)
+                        LOG.info('DB is finished: %s[%s-%s][%s ~ %s]' %
+                                 ('_'.join(key), city_full_name, sub_city_full_name, min_page, max_page))
+
+                    min_page = max_page + 1
 
     def single_run(self):
         """
@@ -309,6 +370,8 @@ class SpiderTYCClass(BASECLASS):
             self._single_by_key_city()
         elif IS_PLUS_CITY and IS_PLUS_CITY_SUB:
             self._single_by_key_sub_city()
+        elif not IS_PLUS_CITY and IS_PLUS_CITY_SUB:
+            self._single_by_key_only_sub_city()
 
     def _process_by_key(self):
         manager = multiprocessing.Manager()
@@ -335,7 +398,7 @@ class SpiderTYCClass(BASECLASS):
                     max_page = max_pagination
                 process.append(
                     pool.apply_async(self.tyc_client.work_by_key, args=(key, min_page, max_page,
-                                                                        q, self.citys_list, self.sub_citys_dict))
+                                                                        q, self.citys_list, self.sub_citys_mapping))
                 )
                 min_page = max_page + 1
 
@@ -387,8 +450,8 @@ class SpiderTYCClass(BASECLASS):
                     sys.exit(1)
 
                 city_full_name = city_info.get('full_name')
-                min_page, max_page, max_pagination, max_range = self.tyc_client.get_pagination(key, _type='city',
-                                                                                               city_id=cid, cityes=self.citys_list)
+                min_page, max_page, max_pagination, max_range = \
+                    self.tyc_client.get_pagination(key, _type='city', city_id=cid, cityes=self.citys_list)
 
                 LOG.info('[%s][%s][%s]spider page: %s ~ %s ||| max_pagination: %s ||| max range: %s'
                          % (RUN_MODE, key, city_full_name, min_page, max_page, max_pagination, max_range))
@@ -453,7 +516,7 @@ class SpiderTYCClass(BASECLASS):
                     LOG.info('@@@@@: %s is not have city information, exit...' % cid)
                     sys.exit(1)
                 city_full_name = city_info.get('full_name')
-                sub_city_infos = self.sub_citys_dict.get(cid)
+                sub_city_infos = self.sub_citys_mapping.get(cid)
 
                 if not sub_city_infos:
                     LOG.info('%s is not have sub_city_infos, exit...' % cid)
@@ -512,17 +575,96 @@ class SpiderTYCClass(BASECLASS):
             LOG.info('DB is finished[%s ~ %s]: %s' % (MIN_PAGE, MAX_PAGE, '_'.join(self.keys))) \
                 if (MIN_PAGE and MAX_PAGE) else LOG.info('DB is finished[ALL]: %s' % ('_'.join(self.keys)))
 
+    def _process_by_key_only_sub_city(self):
+        manager = multiprocessing.Manager()
+        q = manager.Queue()
+
+        pool = multiprocessing.Pool(processes=(MAX_CPU - 1 if MAX_CPU > 2 else 1))
+        LOG.info('Main process: %s, run cpu count: %s' % (os.getpid(), (MAX_CPU - 1 if MAX_CPU > 2 else 1)))
+        process = list()
+
+        for key in self.keys:
+            if not key:
+                continue
+
+            for sub_cid in PLUS_CITYS:
+                if not sub_cid:
+                    continue
+                if not isinstance(sub_cid, int):
+                    sub_cid = int(sub_cid)
+
+                sub_city_info = self.sub_citys_dict.get(sub_cid)
+                if not sub_city_info:
+                    LOG.info('@@@@@: %s is not have sub_city information, exit...' % sub_cid)
+                    sys.exit(1)
+                sub_city_pid = sub_city_info.get('parent_id')
+                city_info = self.citys_list.get(sub_city_pid)
+                if not city_info:
+                    LOG.info('@@@@@: %s is not have parent city information, exit...' % sub_cid)
+                    sys.exit(1)
+
+                city_id = city_info.get('id')
+                city_full_name = city_info.get('full_name')
+                sub_city_id = sub_city_info.get('id')
+                min_page, max_page, max_pagination, max_range = self.tyc_client.get_pagination(key, _type='sub_city',
+                                                                                               city_id=city_id,
+                                                                                               sub_city_id=sub_city_id,
+                                                                                               cityes=self.citys_list,
+                                                                                               sub_city_info=sub_city_info)
+                max_pagination = int(max_pagination)
+                LOG.info('[%s][%s][%s-%s]spider page: %s ~ %s ||| max_pagination: %s ||| max range: %s'
+                         % (RUN_MODE, key, city_full_name, sub_city_info.get('full_name'), min_page, max_page, max_pagination, max_range))
+                if not max_range:
+                    LOG.error("It's not have max range")
+                    sys.exit()
+
+                for i in range(0, max_range, 1):
+                    max_page = min_page + PAGINATION
+                    if max_page > max_pagination:
+                        max_page = max_pagination
+                    process.append(
+                        pool.apply_async(self.tyc_client.work_by_key, args=(key, min_page, max_page, 'city',
+                                                                            q, city_id, sub_city_id, city_info, sub_city_info))
+                    )
+                    min_page = max_page + 1
+
+        pool.close()
+        pool.join()
+
+        while 1:
+            try:
+                if q.empty():
+                    break
+                self.ret_res_list.append(q.get_nowait())
+            except:
+                pass
+
+        if STORE_EXCEL:
+            if (MIN_PAGE and MAX_PAGE):
+                to_excel_name = os.path.join(get_excel_folder(), '%s[%s]-%s[%s~%s].xls'
+                                             % (get_now(), API_MODE, '_'.join(self.keys), MIN_PAGE, MAX_PAGE))
+            else:
+                to_excel_name = os.path.join(get_excel_folder(), '%s[%s]-%s[ALL].xls' % (get_now(), API_MODE, '_'.join(self.keys)))
+            self.excel_client.to_excel(self.ret_res_list, ATTRS_DICT, to_excel_name)
+            LOG.info(to_excel_name)
+        if STORE_DB:
+            self.enterprise_service.adds(self.ret_res_list)
+            LOG.info('DB is finished[%s ~ %s]: %s' % (MIN_PAGE, MAX_PAGE, '_'.join(self.keys))) \
+                if (MIN_PAGE and MAX_PAGE) else LOG.info('DB is finished[ALL]: %s' % ('_'.join(self.keys)))
+
     def process_run(self):
         """
         multiprocess mode to run
         :return: None
         """
-        if not IS_PLUS_CITY and not IS_PLUS_CITY_SUB:
+        if not IS_PLUS_CITY and not IS_PLUS_CITY_SUB:  # key
             self._process_by_key()
-        elif IS_PLUS_CITY and not IS_PLUS_CITY_SUB:
+        elif IS_PLUS_CITY and not IS_PLUS_CITY_SUB:  # key + 省份
             self._process_by_key_city()
-        elif IS_PLUS_CITY and IS_PLUS_CITY_SUB:
+        elif IS_PLUS_CITY and IS_PLUS_CITY_SUB:  # key + 省（all市）
             self._process_by_key_sub_city()
+        elif not IS_PLUS_CITY and IS_PLUS_CITY_SUB:  # key + 市
+            self._process_by_key_only_sub_city()
 
     def gevent_run(self):
         jobs = list()

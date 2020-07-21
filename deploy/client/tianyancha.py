@@ -249,8 +249,8 @@ class TianYanChaClient(object):
                 res_dict['tyc_url'] = tyc_url
                 res_dict['name'] = tag.get_text().strip()
                 res_dict['key'] = key
-                res_dict['city'] = '-'
-                res_dict['sub_city'] = '-'
+                res_dict['city'] = city_info.get('full_name') or '-'
+                res_dict['sub_city'] = sub_city_info.get('full_name') or '-'
                 detail_res = list()
                 if API_MODE == 'tyc':
                     detail_res = self.detail_by_url(res_dict.get('tyc_url'))

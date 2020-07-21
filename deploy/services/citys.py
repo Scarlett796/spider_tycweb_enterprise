@@ -65,3 +65,10 @@ class CitysService(object):
             for i in _res:
                 ret_list.append(i.id)
         return ret_list
+
+    def get_pcity_by_id(self, cid):
+        city_info = self.citys_bo.get_by_id(cid)
+        if not city_info:
+            return {}
+        city_info_pid = city_info.pid
+        return self.citys_bo.get_by_id(city_info_pid)

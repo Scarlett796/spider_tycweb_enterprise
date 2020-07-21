@@ -23,10 +23,12 @@
 位置：etc/config.yaml
 
 - SERVER: 服务基础信息
+
 其中，KEYS为查询关键字，可以设置多个，建议3 ～ 6个，并且用英文逗号","进行分割
 RUN_MODE（运行模式）项目可采用不同的模式进行数据抓取，包含3种模式：single单进程 process多进程 gevent多协程，使用process模式时，建议关键字的个数 < CPU-1
 IS_TEST_BREAK是否开启测试模式，测试模式是只获取每页的一条数据，快速进行数据抓取测试项目
 - PAGINATION
+
 PAGINATION为page的分割数，到达指定的分割数为一个分割excel文件
 主要用于single运行模式，能够快速的进行数据存储，避免获取数据获取过程中失败导致重新运行
 如果发生失败，只需要配置MIN_PAGE（最小页数）、MAX_PAGE（最大页数），程序运行会从MIN_PAGE获取到MAX_PAGE
@@ -36,6 +38,7 @@ PAGINATION建议为10的整倍数（10、20），程序默认为10
 - FILES: 文件输出位置，如果无默认会在项目root目录下建立excel文件夹进行数据存放
 - STORE: 输出方式，excel与db
 - APIS
+
 天眼查的相关的APIS配置
 API_MODE：数据抓取请求地址服务，分为pro专业版 tyc普通版，默认tyc普通版，不同版本请求服务地址不同
 TYC_COOKIE为pc网站登录请求的cookie
@@ -43,6 +46,14 @@ IS_PLUS_CITY是否开启省份过滤条件
 IS_PLUS_CITY_SUB是否开启城市过滤条件，基于IS_PLUS_CITY为True
 PLUS_CITYS为省份code，在db/db.sql文件中有create、insert的sql语句，选择对应省份的id，多个请用用英文逗号","进行分割
 - PROXY: 代理相关的API，如果无代理API接口，IS_RUN设置False
+
+
+#### IS_PLUS_CITY && IS_PLUS_CITY_SUB 组合
+- IS_PLUS_CITY（True）&& IS_PLUS_CITY_SUB（True）：PLUS_CITYS为省份code，查询为key + 对应省份全部的市
+- IS_PLUS_CITY（True）&& IS_PLUS_CITY_SUB（False）：PLUS_CITYS为省份code，查询为key + 对应省份数据，无市
+- IS_PLUS_CITY（False）&& IS_PLUS_CITY_SUB（True）：PLUS_CITYS为市code，查询为key + 对应市的数据
+- IS_PLUS_CITY（False）&& IS_PLUS_CITY_SUB（False）：仅为key查询
+
 
 > ### 问题
 
