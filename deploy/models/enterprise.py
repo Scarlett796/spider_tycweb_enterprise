@@ -51,3 +51,5 @@ class EnterpriseModel(base.ModelBase):
     business_scope = Column(TEXT())
     key = Column(String(55))
     create_time = Column(TIMESTAMP)
+    city = Column(String(55))
+    sub_city = Column(String(55))

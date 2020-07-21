@@ -40,7 +40,9 @@ class EnterpriseService(object):
         'business_term',
         'resume',
         'business_scope',
-        'key'
+        'key',
+        'city',
+        'sub_city'
     ]
 
     def __init__(self):
@@ -93,6 +95,8 @@ class EnterpriseService(object):
             new_model.business_scope = data.get('business_scope')
             new_model.key = data.get('key')
             new_model.create_time = get_now()
+            new_model.city =  data.get('city')
+            new_model.sub_city = data.get('sub_city')
             try:
                 self.enterprise_bo.add_model(new_model)
                 success_list.append(name)

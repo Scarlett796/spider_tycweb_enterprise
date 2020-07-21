@@ -4,7 +4,7 @@
 架子已经基本搭建起来，git clone之后修改配置即可运行，在此基础上可进行二次开发。
 
 - python 开发语言，基于python3
-- mysql 数据库
+- mysql 默认数据库
 
 关于python方面，主要使用了requests、sqlalchemy、xlwt包。
 项目主要运行于Linux系统上，本人使用测试机Mac，线上服务器为Centos7.0。
@@ -16,24 +16,32 @@
 - git clone https://github.com/GIS90/spider_tycweb_enterprise.git
 - 更新web配置文件：etc/config.py，根据不同需求进行项目更改
 - 安装项目运行的环境：python install_env.py，建立项目独立的运行环境，安装了virtualenv、python、packages等操作，了解具体详情请参考代码
-- 启动项目：项目root目录，执行python run.py
+- 启动项目：项目root目录，使用install_env.py安装的虚拟环境，执行python run.py
 
 > ### 配置说明
 
 位置：etc/config.yaml
+
 - SERVER: 服务基础信息
 其中，KEYS为查询关键字，可以设置多个，建议3 ～ 6个，并且用英文逗号","进行分割
 RUN_MODE（运行模式）项目可采用不同的模式进行数据抓取，包含3种模式：single单进程 process多进程 gevent多协程，使用process模式时，建议关键字的个数 < CPU-1
-IS_TEST_BREAK是否开启测试模式，测试模式是只获取每页的一条数据
+IS_TEST_BREAK是否开启测试模式，测试模式是只获取每页的一条数据，快速进行数据抓取测试项目
 - PAGINATION
-PAGINATION为page的分割数，到达指定的分割数为一个分割excel文件，主要目的是避免获取数据获取过程中失败导致重新运行
+PAGINATION为page的分割数，到达指定的分割数为一个分割excel文件
+主要用于single运行模式，能够快速的进行数据存储，避免获取数据获取过程中失败导致重新运行
 如果发生失败，只需要配置MIN_PAGE（最小页数）、MAX_PAGE（最大页数），程序运行会从MIN_PAGE获取到MAX_PAGE
 PAGINATION建议为10的整倍数（10、20），程序默认为10
 - LOG: 日志，如果无LOG_DIR默认会在项目root目录下建立log文件夹进行日志存放
 - DB: 数据库连接，项目中包含数据库信息（请勿乱更改或者操作数据库）
 - FILES: 文件输出位置，如果无默认会在项目root目录下建立excel文件夹进行数据存放
 - STORE: 输出方式，excel与db
-- APIS: 天眼查的APIS，模式API_MODE: pro专业版 tyc普通版，默认tyc普通版，不同版本请求服务地址不同
+- APIS
+天眼查的相关的APIS配置
+API_MODE：数据抓取请求地址服务，分为pro专业版 tyc普通版，默认tyc普通版，不同版本请求服务地址不同
+TYC_COOKIE为pc网站登录请求的cookie
+IS_PLUS_CITY是否开启省份过滤条件
+IS_PLUS_CITY_SUB是否开启城市过滤条件，基于IS_PLUS_CITY为True
+PLUS_CITYS为省份code，在db/db.sql文件中有create、insert的sql语句，选择对应省份的id，多个请用用英文逗号","进行分割
 - PROXY: 代理相关的API，如果无代理API接口，IS_RUN设置False
 
 > ### 问题
@@ -50,6 +58,7 @@ PAGINATION建议为10的整倍数（10、20），程序默认为10
 - 多进程模式运行
 - 支持普通版（www.tianyancha.com）、专业版（pro.tianyancha.com）
 - 支持请求代理，需要配置指定代理API
+- 支持依据省份进行数据抓取
 
 > ### 开发中功能
 
@@ -66,6 +75,8 @@ PAGINATION建议为10的整倍数（10、20），程序默认为10
 
 - 项目部分代码借鉴了我的web脚手架代码（https://github.com/GIS90/base_webframe）
 - 在请求获取详情数据时候，设置time.sleep，以免反爬机制认为是恶意爬取
+- 线上服务器都被禁止限制了，请求返回403（本人是腾讯虚拟机服务器）
+- 可以申请专业版试用，一个月期限
 
 
 > ### 联系方式

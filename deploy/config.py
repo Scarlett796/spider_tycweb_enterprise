@@ -97,6 +97,9 @@ TYC_DETAIL_API = None
 TYC_PRO_SEARCH_API = None
 TYC_PRO_DETAIL_API = None
 TYC_COOKIE = None
+IS_PLUS_CITY = False
+IS_PLUS_CITY_SUB = False
+PLUS_CITYS = list()
 
 # proxy
 PROXY_API = None
@@ -166,6 +169,19 @@ with open(_config_file) as f:
     TYC_PRO_SEARCH_API = _config_info['APIS']['TYC_PRO_SEARCH'] or TYC_PRO_SEARCH_API
     TYC_PRO_DETAIL_API = _config_info['APIS']['TYC_PRO_DETAIL'] or TYC_PRO_DETAIL_API
     TYC_COOKIE = _config_info['APIS']['TYC_COOKIE'] or TYC_COOKIE
+    IS_PLUS_CITY = _config_info['APIS']['IS_PLUS_CITY'] or IS_PLUS_CITY
+    IS_PLUS_CITY_SUB = _config_info['APIS']['IS_PLUS_CITY_SUB'] or IS_PLUS_CITY_SUB
+    PLUS_CITYS = _config_info['APIS']['PLUS_CITYS'] or PLUS_CITYS
+    if IS_PLUS_CITY:
+        if not PLUS_CITYS:
+            logger.error('Please config search city, use english "," to split.')
+            sys.exit(1)
+        if isinstance(PLUS_CITYS, int):
+            PLUS_CITYS = str(PLUS_CITYS)
+        if PLUS_CITYS.find('，') > -1:
+            logger.critical('====== config PLUS_CITYS split is english symbol ","... ======')
+            sys.exit(1)
+        PLUS_CITYS = PLUS_CITYS.strip().split(',')
 
     # proxy
     PROXY_API = _config_info['PROXY']['API'] or PROXY_API

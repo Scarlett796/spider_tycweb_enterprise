@@ -22,12 +22,14 @@ from urllib import parse
 from bs4 import BeautifulSoup
 
 from deploy.config import RUN_MODE, API_MODE, TYC_COOKIE, \
-    TYC_SEARCH_API, \
+    TYC_SEARCH_API, MIN_PAGE, MAX_PAGE, PAGINATION, \
     TYC_PRO_SEARCH_API, TYC_PRO_DETAIL_API, IS_TEST_BREAK
 from deploy.utils.http import api_get
 from deploy.utils.logger import logger as LOG
 from deploy.utils.utils import random_sleep
 
+ZXS_CITY_IDS = [1, 2, 3, 4, 5]
+NO_SUB_CITY_IDS = [33, 34, 35]
 
 
 class TianYanChaClient(object):
@@ -57,68 +59,145 @@ class TianYanChaClient(object):
             "Sec-Fetch-Dest": "document"
         }
 
-    def get_pagination(self, key):
+    def get_pagination(self, key, _type='default', city_id=None, sub_city_id=None,
+                       cityes=None, sub_city_info=None):
         min_page = self.MIN_PAGE
         max_page = self.MAX_PAGE
-        if not key:
-            return min_page, max_page
+
+        if (max_page - min_page) / PAGINATION == (max_page - min_page) // PAGINATION:
+            max_range = (max_page - min_page) // PAGINATION
+        else:
+            max_range = (max_page - min_page) // PAGINATION + 1
+
+        if API_MODE not in ['tyc', 'pro']:
+            return min_page, max_page, max_page, max_range
 
         if API_MODE == 'tyc':
-            return min_page, max_page
+            return min_page, max_page, max_page, max_range
+        elif API_MODE == 'pro' and _type == 'city':
+            city_info = cityes.get(city_id)
+            url = '%s?key=%s&base=%s' % (TYC_PRO_SEARCH_API, parse.quote(key), city_info.get('name'))
+        elif API_MODE == 'pro' and _type == 'sub_city':
+            city_info = cityes.get(city_id)
+            if city_id in ZXS_CITY_IDS:
+                url = '%s?key=%s&base=%s&areaCode=%s&baseArea=%s' \
+                      % (TYC_PRO_SEARCH_API, parse.quote(key), city_info.get('name'), sub_city_info.get('code'), parse.quote(sub_city_info.get('name')))
+            else:
+                url = '%s?key=%s&base=%s' % (TYC_PRO_SEARCH_API, parse.quote(key), sub_city_info.get('name'))
         elif API_MODE == 'pro':
-            url = '%s/p%s?key=%s' % (TYC_PRO_SEARCH_API, '0', parse.quote(key))
-            is_ok, search_resp = api_get(url=url,
-                                         headers=self.headers,
-                                         data={},
-                                         resptype='text')
+            url = '%s?key=%s' % (TYC_PRO_SEARCH_API, parse.quote(key))
 
-            soup = BeautifulSoup(search_resp, 'lxml')
-            search_pagination = soup.find_all('div', class_='search-pagination')
+        is_ok, search_resp = api_get(url=url,
+                                     headers=self.headers,
+                                     data={},
+                                     resptype='text')
 
-            def while_req(url):
-                sub_is_ok, sub_search_resp = api_get(url=url,
-                                         headers=self.headers,
-                                         data={},
-                                         resptype='text')
-                return sub_is_ok, sub_search_resp
+        soup = BeautifulSoup(search_resp, 'lxml')
+        search_pagination = soup.find_all('div', class_='search-pagination')
 
-            # 添加手动验证功能
-            if len(search_pagination) == 0 or not is_ok:
-                while 1:
-                    if is_ok and len(search_pagination) > 0:
-                        break
-                    else:
-                        LOG.critical('验证############### %s ###############' % url)
-                        random_sleep(20,25)
-                        is_ok, search_resp = while_req(url)
-                        soup = BeautifulSoup(search_resp, 'lxml')
-                        search_pagination = soup.find_all('div', class_='search-pagination')
+        # 仅一页
+        if is_ok and not search_pagination:
+            return 0, 1, 1, 1
 
-            l = len(search_pagination[0].find_all('a'))
-            for index_a, a in enumerate(search_pagination[0].find_all('a')):
-                if index_a == (l - 2):
-                    max_page = a.string.strip()
-                    if max_page.find('...') > -1:
-                        max_page = max_page.split('...')[1]
-                        if isinstance(max_page, str):
-                            max_page = int(max_page)
+        def while_req(url):
+            sub_is_ok, sub_search_resp = api_get(url=url,
+                                                 headers=self.headers,
+                                                 data={},
+                                                 resptype='text')
+            return sub_is_ok, sub_search_resp
+
+        # 添加手动验证功能
+        if len(search_pagination) == 0 or not is_ok:
+            while 1:
+                if is_ok and len(search_pagination) > 0:
                     break
-            LOG.info('[%s] pagination max: %s' % (key, max_page))
-            return min_page, max_page
+                else:
+                    LOG.critical('验证############### %s ###############' % url)
+                    random_sleep(20, 25)
+                    is_ok, search_resp = while_req(url)
+                    soup = BeautifulSoup(search_resp, 'lxml')
+                    search_pagination = soup.find_all('div', class_='search-pagination')
 
-    def work_by_key(self, key, min_page, max_page, queue=None):
+        l = len(search_pagination[0].find_all('a'))
+        for index_a, a in enumerate(search_pagination[0].find_all('a')):
+            if index_a == (l - 2):
+                max_page = a.string.strip()
+                if max_page.find('...') > -1:
+                    max_page = max_page.split('...')[1]
+                    if isinstance(max_page, str):
+                        max_page = int(max_page)
+                break
+
+        max_pagination = max_page
+        if MIN_PAGE:
+            min_page = int(MIN_PAGE)
+        if MAX_PAGE:
+            max_page = int(MAX_PAGE) if (int(MAX_PAGE) < int(max_pagination)) \
+                else int(max_pagination)
+
+        if min_page == max_page:
+            max_range = 1
+        elif min_page > max_page:
+            LOG.critical('Page min and max is error: min[%s] max[%s]' % (min_page, max_page))
+            sys.exit()
+        else:
+            if (max_page - min_page) / PAGINATION == (max_page - min_page) // PAGINATION:
+                max_range = (max_page - min_page) // PAGINATION
+            else:
+                max_range = (max_page - min_page) // PAGINATION + 1
+
+        return min_page, max_page, max_pagination, max_range
+
+    def check_no(self, url, _type='detail'):
+        if _type not in ['page', 'detail']:
+            return False
+
+        is_ok, search_resp = api_get(url=url,
+                                     headers=self.headers,
+                                     data={},
+                                     resptype='text')
+
+        if not is_ok:
+            return False
+        if _type == 'page':
+            print(url)
+            soup = BeautifulSoup(search_resp, 'lxml')
+            tags = soup.find_all('div', class_='f20 mb16 mt12 sec-c1 nodata_title_new')
+            if tags:
+                if tags[0].get_text() == '抱歉，没有找到相关结果！' \
+                        or tags[0].string == '抱歉，没有找到相关结果！':
+                    return True
+
+        return False
+
+    def work_by_key(self, key, min_page, max_page, type='default',
+                    queue=None, cid=None, sub_cid=None, city_info=None, sub_city_info=None):
         ret_res = list()
         if not key:
             LOG.error("【%s】key is null, no work." % RUN_MODE)
             return ret_res
 
-        LOG.info('[%s]run page: %s ~ %s' % (key, min_page, max_page))
         # page
         for page in range(min_page, max_page + 1, 1):
-            if API_MODE == 'tyc':
+            if API_MODE == 'tyc' and type == 'default':
                 url = '%s/p%s?key=%s' % (TYC_SEARCH_API, page, parse.quote(key))
-            elif API_MODE == 'pro':
+            elif API_MODE == 'tyc' and type == 'city':
+                url = '%s/p%s?key=%s&base=%s' % (TYC_SEARCH_API, page, parse.quote(key), city_info.get('name'))
+            elif API_MODE == 'tyc' and type == 'sub_city':
+                if cid in ZXS_CITY_IDS:
+                    url = '%s/p%s?key=%s&base=%s&areaCode=%s' % (TYC_SEARCH_API, page, parse.quote(key), sub_city_info.get('name'), sub_city_info.get('code'))
+                else:
+                    url = '%s/p%s?key=%s&base=%s' % (TYC_SEARCH_API, page, parse.quote(key), sub_city_info.get('name'))
+            elif API_MODE == 'pro' and type == 'default':
                 url = '%s/p%s?key=%s' % (TYC_PRO_SEARCH_API, page, parse.quote(key))
+            elif API_MODE == 'pro' and type == 'city':
+                url = '%s/p%s?key=%s&base=%s' % (TYC_PRO_SEARCH_API, page, parse.quote(key), city_info.get('name'))
+            elif API_MODE == 'pro' and type == 'sub_city':
+                if cid in ZXS_CITY_IDS:
+                    url = '%s/p%s?key=%s&base=%s&areaCode=%s&baseArea=%s' \
+                          % (TYC_PRO_SEARCH_API, page, parse.quote(key), city_info.get('name'), sub_city_info.get('code'), parse.quote(sub_city_info.get('name')))
+                else:
+                    url = '%s/p%s?key=%s&base=%s' % (TYC_PRO_SEARCH_API, page, parse.quote(key), sub_city_info.get('name'))
             else:
                 LOG.critical('====== API_MODE is not in [tyc, pro] ======')
                 sys.exit(1)
@@ -131,15 +210,17 @@ class TianYanChaClient(object):
 
             if not is_ok:
                 continue
+            if self.check_no(url, _type='page'):
+                continue
 
             soup = BeautifulSoup(search_resp, 'lxml')
             tags = soup.find_all('a', attrs={"tyc-event-ch": "CompanySearch.Company"})
 
             def while_req(url):
                 sub_is_ok, sub_search_resp = api_get(url=url,
-                                         headers=self.headers,
-                                         data={},
-                                         resptype='text')
+                                                     headers=self.headers,
+                                                     data={},
+                                                     resptype='text')
                 return sub_is_ok, sub_search_resp
 
             # 添加手动验证功能
@@ -149,7 +230,7 @@ class TianYanChaClient(object):
                         break
                     else:
                         LOG.critical('验证############### %s ###############' % url)
-                        random_sleep(20,25)
+                        random_sleep(20, 25)
                         is_ok, search_resp = while_req(url)
                         soup = BeautifulSoup(search_resp, 'lxml')
                         tags = soup.find_all('a', attrs={"tyc-event-ch": "CompanySearch.Company"})
@@ -168,6 +249,8 @@ class TianYanChaClient(object):
                 res_dict['tyc_url'] = tyc_url
                 res_dict['name'] = tag.get_text().strip()
                 res_dict['key'] = key
+                res_dict['city'] = '-'
+                res_dict['sub_city'] = '-'
                 detail_res = list()
                 if API_MODE == 'tyc':
                     detail_res = self.detail_by_url(res_dict.get('tyc_url'))
@@ -204,9 +287,9 @@ class TianYanChaClient(object):
 
         def while_req(url):
             sub_is_ok, sub_search_resp = api_get(url=url,
-                                     headers=self.headers,
-                                     data={},
-                                     resptype='text')
+                                                 headers=self.headers,
+                                                 data={},
+                                                 resptype='text')
             return sub_is_ok, sub_search_resp
 
         # 添加手动验证功能
@@ -343,9 +426,9 @@ class TianYanChaClient(object):
 
         def while_req(url):
             sub_is_ok, sub_search_resp = api_get(url=url,
-                                     headers=self.headers,
-                                     data={},
-                                     resptype='text')
+                                                 headers=self.headers,
+                                                 data={},
+                                                 resptype='text')
             return sub_is_ok, sub_search_resp
 
         # 添加手动验证功能
@@ -393,7 +476,7 @@ class TianYanChaClient(object):
                 for big_index, big_child in enumerate(div):
                     if big_index == 0:
                         for sub_index, sub_child in enumerate(big_child):
-                            if sub_index ==1:
+                            if sub_index == 1:
                                 resume = sub_child.string
                                 if resume:
                                     resume = resume.strip()
