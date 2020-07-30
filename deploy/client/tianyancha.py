@@ -56,7 +56,12 @@ class TianYanChaClient(object):
             "Host": host,
             "Cookie": TYC_COOKIE,
             "Connection": "keep-alive",
-            "Sec-Fetch-Dest": "document"
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "same-site",
+            "Sec-Fetch-User": "?1",
+            "Accept-Language": 'zh,zh-CN;q=0.9,en;q=0.8,ru;q=0.7',
+            "Upgrade-Insecure-Requests": '1'
         }
 
     def get_pagination(self, key, _type='default', city_id=None, sub_city_id=None,
@@ -72,8 +77,18 @@ class TianYanChaClient(object):
         if API_MODE not in ['tyc', 'pro']:
             return min_page, max_page, max_page, max_range
 
-        if API_MODE == 'tyc':
-            return min_page, max_page, max_page, max_range
+        if API_MODE == 'tyc' and _type == 'city':
+            city_info = cityes.get(city_id)
+            url = '%s?key=%s&base=%s' % (TYC_SEARCH_API, parse.quote(key), city_info.get('name'))
+        elif API_MODE == 'tyc' and _type == 'sub_city':
+            city_info = cityes.get(city_id)
+            if city_id in ZXS_CITY_IDS:
+                url = '%s?key=%s&base=%s&areaCode=%s&baseArea=%s' \
+                      % (TYC_SEARCH_API, parse.quote(key), city_info.get('name'), sub_city_info.get('code'), parse.quote(sub_city_info.get('name')))
+            else:
+                url = '%s?key=%s&base=%s' % (TYC_SEARCH_API, parse.quote(key), sub_city_info.get('name'))
+        elif API_MODE == 'tyc':
+            url = '%s?key=%s' % (TYC_SEARCH_API, parse.quote(key))
         elif API_MODE == 'pro' and _type == 'city':
             city_info = cityes.get(city_id)
             url = '%s?key=%s&base=%s' % (TYC_PRO_SEARCH_API, parse.quote(key), city_info.get('name'))
@@ -87,6 +102,7 @@ class TianYanChaClient(object):
         elif API_MODE == 'pro':
             url = '%s?key=%s' % (TYC_PRO_SEARCH_API, parse.quote(key))
 
+        self.headers['Referer'] = url
         is_ok, search_resp = api_get(url=url,
                                      headers=self.headers,
                                      data={},
@@ -152,6 +168,7 @@ class TianYanChaClient(object):
         if _type not in ['page', 'detail']:
             return False
 
+        self.headers['Referer'] = url
         is_ok, search_resp = api_get(url=url,
                                      headers=self.headers,
                                      data={},
@@ -160,7 +177,6 @@ class TianYanChaClient(object):
         if not is_ok:
             return False
         if _type == 'page':
-            print(url)
             soup = BeautifulSoup(search_resp, 'lxml')
             tags = soup.find_all('div', class_='f20 mb16 mt12 sec-c1 nodata_title_new')
             if tags:
@@ -203,11 +219,11 @@ class TianYanChaClient(object):
                 sys.exit(1)
             LOG.info('%s[%s]%s' % (key, API_MODE, url))
 
+            self.headers['Referer'] = url
             is_ok, search_resp = api_get(url=url,
                                          headers=self.headers,
                                          data={},
                                          resptype='text')
-
             if not is_ok:
                 continue
             if self.check_no(url, _type='page'):
@@ -215,7 +231,6 @@ class TianYanChaClient(object):
 
             soup = BeautifulSoup(search_resp, 'lxml')
             tags = soup.find_all('a', attrs={"tyc-event-ch": "CompanySearch.Company"})
-
             def while_req(url):
                 sub_is_ok, sub_search_resp = api_get(url=url,
                                                      headers=self.headers,
@@ -249,8 +264,9 @@ class TianYanChaClient(object):
                 res_dict['tyc_url'] = tyc_url
                 res_dict['name'] = tag.get_text().strip()
                 res_dict['key'] = key
-                res_dict['city'] = city_info.get('full_name') or '-'
-                res_dict['sub_city'] = sub_city_info.get('full_name') or '-'
+                res_dict['is_send_email'] = False
+                res_dict['city'] = city_info.get('full_name') if city_info else '-'
+                res_dict['sub_city'] = sub_city_info.get('full_name') if sub_city_info else '-'
                 detail_res = list()
                 if API_MODE == 'tyc':
                     detail_res = self.detail_by_url(res_dict.get('tyc_url'))
@@ -261,7 +277,7 @@ class TianYanChaClient(object):
                 ret_res.append(res_dict)
                 if queue:
                     queue.put(res_dict)
-                random_sleep(3.2, 4.5)
+                random_sleep(3.5, 4.5)
                 if IS_TEST_BREAK:
                     break
             if IS_TEST_BREAK:
@@ -273,6 +289,7 @@ class TianYanChaClient(object):
         if not comp_url:
             return detail_res
 
+        self.headers['Referer'] = comp_url
         is_ok, search_resp = api_get(url=comp_url,
                                      headers=self.headers,
                                      data={},
@@ -410,6 +427,7 @@ class TianYanChaClient(object):
         if not comp_url:
             return detail_res
 
+        self.headers['Referer'] = comp_url
         is_ok, search_resp = api_get(url=comp_url,
                                      headers=self.headers,
                                      data={},

@@ -19,6 +19,7 @@ base_info:
 # ------------------------------------------------------------
 import requests
 import json
+import sys
 
 
 from deploy.config import IS_PROXY_RUN, PROXY_API
@@ -112,8 +113,9 @@ def api_get(url,  headers={}, data={},
             return False, []
     else:
         respcode = response.status_code
-        # print(respcode, response.content)
         if respcode != 200:
+            if check_404code(response.text):
+                return True, response.text
             return False, 'api_get response status code is: %s' % respcode
         elif respcode == 200 and resptype == 'raw':
             return True, response.raw
@@ -123,6 +125,18 @@ def api_get(url,  headers={}, data={},
             return True, response.json()
         else:
             return True, response.text
+
+
+def check_404code(content):
+    if not content:
+        return False
+
+    # soup = BeautifulSoup(search_resp, 'lxml')
+    # tags = soup.find_all('div', class_='f20 mb16 mt12 sec-c1 nodata_title_new')
+    # if tags:
+    #     if tags[0].get_text() == '抱歉，没有找到相关结果！' \
+    #             or tags[0].string == '抱歉，没有找到相关结果！':
+    return True
 
 
 def get_random_proxy():

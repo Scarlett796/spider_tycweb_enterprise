@@ -99,9 +99,15 @@ class SpiderTYCClass(BASECLASS):
         self.NO_SUB_CITYS = self.__init_no_sub_citys()
         self.__init_return_res()
         self.__init_citys()
+        self.__init_q()
 
     def __init_return_res(self):
         self.ret_res_list = list()
+
+    def __init_q(self):
+        manager = multiprocessing.Manager()
+        q = manager.Queue()
+        self.q = q
 
     def __init_citys(self):
         # 省份
@@ -158,43 +164,56 @@ class SpiderTYCClass(BASECLASS):
     def _print_info(self, message):
         LOG.info('=' * 20 + message + '=' * 20)
 
+    def to_store(self, keys, min_page, max_page, datas=None, excelname=None):
+        _keys = list()
+        if isinstance(keys, list):
+            _keys = keys
+        else:
+            _keys.append(keys)
+        _data = datas if datas else self.ret_res_list
+        if STORE_EXCEL:
+            if (min_page and max_page):
+                to_excel_name = os.path.join(get_excel_folder(), '%s[%s]-%s[%s~%s].xls'
+                                             % (get_now(), API_MODE, '_'.join(_keys), min_page, max_page))
+            else:
+                to_excel_name = os.path.join(get_excel_folder(), '%s[%s]-%s[ALL].xls' % (get_now(), API_MODE, '_'.join(_keys)))
+            self.excel_client.to_excel(_data, ATTRS_DICT, to_excel_name)
+            LOG.info("Excel is finished[%s ~ %s]: %s" % (min_page, max_page, to_excel_name))
+        if STORE_DB:
+            self.enterprise_service.adds(_data)
+            LOG.info('DB is finished[%s ~ %s]: %s' % (min_page, max_page, '_'.join(_keys))) \
+                if (MIN_PAGE and MAX_PAGE) else LOG.info('DB is finished[ALL]: %s' % ('_'.join(_keys)))
+
+    def _is_not_max_range_die(self, max_range):
+        if not max_range:
+            LOG.error("It's not have max range")
+            sys.exit()
+
     def _single_by_key(self):
         for key in self.keys:
             if not key:
                 continue
 
             min_page, max_page, max_pagination, max_range = self.tyc_client.get_pagination(key)
-            if not max_range:
-                LOG.error("It's not have max range")
-                sys.exit()
+            self._is_not_max_range_die(max_range)
             LOG.info('[%s][%s]spider page: %s ~ %s ||| max_pagination: %s ||| max range: %s'
                      % (RUN_MODE, key, min_page, max_page, max_pagination, max_range))
 
+            if not isinstance(max_pagination, int):
+                max_pagination = int(max_pagination)
             for i in range(0, max_range, 1):
                 max_page = PAGINATION + min_page
                 if max_page > max_pagination:
                     max_page = max_pagination
                 self._print_info('[%s][%s]%s ~ %s' % (RUN_MODE, key, min_page, max_page))
                 _res = self.tyc_client.work_by_key(key, min_page, max_page)
-
-                if STORE_EXCEL:
-                    to_excel_name = os.path.join(get_excel_folder(),
-                                                 '%s[%s]-%s[%s~%s].xls' %
-                                                 (get_now(), API_MODE, key, min_page, max_page))
-                    self.excel_client.to_excel(_res, ATTRS_DICT, to_excel_name)
-                    LOG.info(to_excel_name)
-
-                if STORE_DB:
-                    self.enterprise_service.adds(self.ret_res_list)
-                    LOG.info('DB is finished: %s[%s ~ %s]' % ('_'.join(key), min_page, max_page))
-
+                self.to_store(key, min_page, max_page, datas=_res)
                 min_page = max_page + 1
 
     def _single_by_key_city(self):
         for key in self.keys:
             if not key:
                 continue
-
             for cid in PLUS_CITYS:
                 if not cid:
                     continue
@@ -210,30 +229,18 @@ class SpiderTYCClass(BASECLASS):
                 min_page, max_page, max_pagination, max_range = self.tyc_client.get_pagination(key, _type='city',
                                                                                                city_id=cid, cityes=self.citys_list)
 
-                if not max_range:
-                    LOG.error("It's not have max range")
-                    sys.exit()
+                self._is_not_max_range_die(max_range)
                 LOG.info('[%s][%s][%s]spider page: %s ~ %s ||| max_pagination: %s ||| max range: %s'
                          % (RUN_MODE, key, city_full_name, min_page, max_page, max_pagination, max_range))
-
+                if not isinstance(max_pagination, int):
+                    max_pagination = int(max_pagination)
                 for i in range(0, max_range, 1):
                     max_page = PAGINATION + min_page
                     if max_page > max_pagination:
                         max_page = max_pagination
                     self._print_info('[%s][%s][%s]%s ~ %s' % (RUN_MODE, key, city_full_name, min_page, max_page))
                     _res = self.tyc_client.work_by_key(key, min_page, max_page, cid=cid, city_info=city_info)
-
-                    if STORE_EXCEL:
-                        to_excel_name = os.path.join(get_excel_folder(),
-                                                     '%s[%s]-%s[%s][%s~%s].xls' %
-                                                     (get_now(), API_MODE, key, city_full_name, min_page, max_page))
-                        self.excel_client.to_excel(_res, ATTRS_DICT, to_excel_name)
-                        LOG.info(to_excel_name)
-
-                    if STORE_DB:
-                        self.enterprise_service.adds(self.ret_res_list)
-                        LOG.info('DB is finished: %s[%s][%s ~ %s]' % ('_'.join(key), city_full_name, min_page, max_page))
-
+                    self.to_store(key, min_page, max_page, datas=_res)
                     min_page = max_page + 1
 
     def _single_by_key_sub_city(self):
@@ -271,9 +278,7 @@ class SpiderTYCClass(BASECLASS):
                                                                                                    sub_city_info=sub_city_info)
                     if not isinstance(max_pagination, int):
                         max_pagination = int(max_pagination)
-                    if not max_range:
-                        LOG.error("It's not have max range")
-                        sys.exit()
+                    self._is_not_max_range_die(max_range)
                     LOG.info('[%s][%s][%s - %s]spider page: %s ~ %s ||| max_pagination: %s ||| max range: %s'
                              % (RUN_MODE, key, city_full_name, sub_city_full_name, min_page, max_page, max_pagination, max_range))
 
@@ -284,19 +289,7 @@ class SpiderTYCClass(BASECLASS):
                         self._print_info('[%s][%s][%s]%s ~ %s' % (RUN_MODE, key, city_full_name, min_page, max_page))
                         _res = self.tyc_client.work_by_key(key, min_page, max_page, cid=cid, sub_cid=sub_city_id,
                                                            city_info=city_info, sub_city_info=sub_city_info)
-
-                        if STORE_EXCEL:
-                            to_excel_name = os.path.join(get_excel_folder(),
-                                                         '%s[%s]-%s[%s-%s][%s~%s].xls' %
-                                                         (get_now(), API_MODE, key, city_full_name, sub_city_full_name, min_page, max_page))
-                            self.excel_client.to_excel(_res, ATTRS_DICT, to_excel_name)
-                            LOG.info(to_excel_name)
-
-                        if STORE_DB:
-                            self.enterprise_service.adds(self.ret_res_list)
-                            LOG.info('DB is finished: %s[%s-%s][%s ~ %s]' %
-                                     ('_'.join(key), city_full_name, sub_city_full_name, min_page, max_page))
-
+                        self.to_store(key, min_page, max_page, datas=_res)
                         min_page = max_page + 1
 
     def _single_by_key_only_sub_city(self):
@@ -333,9 +326,7 @@ class SpiderTYCClass(BASECLASS):
                 max_pagination = int(max_pagination)
                 LOG.info('[%s][%s][%s-%s]spider page: %s ~ %s ||| max_pagination: %s ||| max range: %s'
                          % (RUN_MODE, key, city_full_name, sub_city_full_name, min_page, max_page, max_pagination, max_range))
-                if not max_range:
-                    LOG.error("It's not have max range")
-                    sys.exit()
+                self._is_not_max_range_die(max_range)
 
                 for i in range(0, max_range, 1):
                     max_page = PAGINATION + min_page
@@ -344,19 +335,7 @@ class SpiderTYCClass(BASECLASS):
                     self._print_info('[%s][%s][%s]%s ~ %s' % (RUN_MODE, key, city_full_name, min_page, max_page))
                     _res = self.tyc_client.work_by_key(key, min_page, max_page, cid=city_id, sub_cid=sub_city_id,
                                                        city_info=city_info, sub_city_info=sub_city_info)
-
-                    if STORE_EXCEL:
-                        to_excel_name = os.path.join(get_excel_folder(),
-                                                     '%s[%s]-%s[%s-%s][%s~%s].xls' %
-                                                     (get_now(), API_MODE, key, city_full_name, sub_city_full_name, min_page, max_page))
-                        self.excel_client.to_excel(_res, ATTRS_DICT, to_excel_name)
-                        LOG.info(to_excel_name)
-
-                    if STORE_DB:
-                        self.enterprise_service.adds(self.ret_res_list)
-                        LOG.info('DB is finished: %s[%s-%s][%s ~ %s]' %
-                                 ('_'.join(key), city_full_name, sub_city_full_name, min_page, max_page))
-
+                    self.to_store(key, min_page, max_page, datas=_res)
                     min_page = max_page + 1
 
     def single_run(self):
@@ -374,9 +353,6 @@ class SpiderTYCClass(BASECLASS):
             self._single_by_key_only_sub_city()
 
     def _process_by_key(self):
-        manager = multiprocessing.Manager()
-        q = manager.Queue()
-
         pool = multiprocessing.Pool(processes=(MAX_CPU - 1 if MAX_CPU > 2 else 1))
         LOG.info('Main process: %s, run cpu count: %s' % (os.getpid(), (MAX_CPU - 1 if MAX_CPU > 2 else 1)))
         process = list()
@@ -398,7 +374,7 @@ class SpiderTYCClass(BASECLASS):
                     max_page = max_pagination
                 process.append(
                     pool.apply_async(self.tyc_client.work_by_key, args=(key, min_page, max_page,
-                                                                        q, self.citys_list, self.sub_citys_mapping))
+                                                                        self.q, self.citys_list, self.sub_citys_mapping))
                 )
                 min_page = max_page + 1
 
@@ -407,29 +383,15 @@ class SpiderTYCClass(BASECLASS):
 
         while 1:
             try:
-                if q.empty():
+                if self.q.empty():
                     break
-                self.ret_res_list.append(q.get_nowait())
+                self.ret_res_list.append(self.q.get_nowait())
             except:
                 pass
 
-        if STORE_EXCEL:
-            if (MIN_PAGE and MAX_PAGE):
-                to_excel_name = os.path.join(get_excel_folder(), '%s[%s]-%s[%s~%s].xls'
-                                             % (get_now(), API_MODE, '_'.join(self.keys), MIN_PAGE, MAX_PAGE))
-            else:
-                to_excel_name = os.path.join(get_excel_folder(), '%s[%s]-%s[ALL].xls' % (get_now(), API_MODE, '_'.join(self.keys)))
-            self.excel_client.to_excel(self.ret_res_list, ATTRS_DICT, to_excel_name)
-            LOG.info(to_excel_name)
-        if STORE_DB:
-            self.enterprise_service.adds(self.ret_res_list)
-            LOG.info('DB is finished[%s ~ %s]: %s' % (MIN_PAGE, MAX_PAGE, '_'.join(self.keys))) \
-                if (MIN_PAGE and MAX_PAGE) else LOG.info('DB is finished[ALL]: %s' % ('_'.join(self.keys)))
+        self.to_store(self.keys, MIN_PAGE, MAX_PAGE)
 
     def _process_by_key_city(self):
-        manager = multiprocessing.Manager()
-        q = manager.Queue()
-
         pool = multiprocessing.Pool(processes=(MAX_CPU - 1 if MAX_CPU > 2 else 1))
         LOG.info('Main process: %s, run cpu count: %s' % (os.getpid(), (MAX_CPU - 1 if MAX_CPU > 2 else 1)))
         process = list()
@@ -455,9 +417,7 @@ class SpiderTYCClass(BASECLASS):
 
                 LOG.info('[%s][%s][%s]spider page: %s ~ %s ||| max_pagination: %s ||| max range: %s'
                          % (RUN_MODE, key, city_full_name, min_page, max_page, max_pagination, max_range))
-                if not max_range:
-                    LOG.error("It's not have max range")
-                    sys.exit()
+                self._is_not_max_range_die(max_range)
 
                 for i in range(0, max_range, 1):
                     max_page = min_page + PAGINATION
@@ -465,7 +425,7 @@ class SpiderTYCClass(BASECLASS):
                         max_page = max_pagination
                     process.append(
                         pool.apply_async(self.tyc_client.work_by_key, args=(key, min_page, max_page, 'city',
-                                                                            q, cid, None, city_info, None))
+                                                                            self.q, cid, None, city_info, None))
                     )
                     min_page = max_page + 1
 
@@ -474,29 +434,15 @@ class SpiderTYCClass(BASECLASS):
 
         while 1:
             try:
-                if q.empty():
+                if self.q.empty():
                     break
-                self.ret_res_list.append(q.get_nowait())
+                self.ret_res_list.append(self.q.get_nowait())
             except:
                 pass
 
-        if STORE_EXCEL:
-            if (MIN_PAGE and MAX_PAGE):
-                to_excel_name = os.path.join(get_excel_folder(), '%s[%s]-%s[%s~%s].xls'
-                                             % (get_now(), API_MODE, '_'.join(self.keys), MIN_PAGE, MAX_PAGE))
-            else:
-                to_excel_name = os.path.join(get_excel_folder(), '%s[%s]-%s[ALL].xls' % (get_now(), API_MODE, '_'.join(self.keys)))
-            self.excel_client.to_excel(self.ret_res_list, ATTRS_DICT, to_excel_name)
-            LOG.info(to_excel_name)
-        if STORE_DB:
-            self.enterprise_service.adds(self.ret_res_list)
-            LOG.info('DB is finished[%s ~ %s]: %s' % (MIN_PAGE, MAX_PAGE, '_'.join(self.keys))) \
-                if (MIN_PAGE and MAX_PAGE) else LOG.info('DB is finished[ALL]: %s' % ('_'.join(self.keys)))
+        self.to_store(self.keys, MIN_PAGE, MAX_PAGE)
 
     def _process_by_key_sub_city(self):
-        manager = multiprocessing.Manager()
-        q = manager.Queue()
-
         pool = multiprocessing.Pool(processes=(MAX_CPU - 1 if MAX_CPU > 2 else 1))
         LOG.info('Main process: %s, run cpu count: %s' % (os.getpid(), (MAX_CPU - 1 if MAX_CPU > 2 else 1)))
         process = list()
@@ -527,7 +473,8 @@ class SpiderTYCClass(BASECLASS):
                         continue
                     sub_city_id = sub_city_info.get('id')
                     sub_city_full_name = sub_city_info.get('full_name')
-                    min_page, max_page, max_pagination, max_range = self.tyc_client.get_pagination(key, _type='sub_city',
+                    min_page, max_page, max_pagination, max_range = self.tyc_client.get_pagination(key,
+                                                                                                   _type='sub_city',
                                                                                                    city_id=cid,
                                                                                                    sub_city_id=sub_city_id,
                                                                                                    cityes=self.citys_list,
@@ -537,9 +484,7 @@ class SpiderTYCClass(BASECLASS):
 
                     LOG.info('[%s][%s][%s - %s]spider page: %s ~ %s ||| max_pagination: %s ||| max range: %s'
                              % (RUN_MODE, key, city_full_name, sub_city_full_name, min_page, max_page, max_pagination, max_range))
-                    if not max_range:
-                        LOG.error("It's not have max range")
-                        sys.exit()
+                    self._is_not_max_range_die(max_range)
 
                     for i in range(0, max_range, 1):
                         max_page = min_page + PAGINATION
@@ -547,7 +492,7 @@ class SpiderTYCClass(BASECLASS):
                             max_page = max_pagination
                         process.append(
                             pool.apply_async(self.tyc_client.work_by_key, args=(key, min_page, max_page, 'sub_city',
-                                                                                q, cid, sub_city_id, city_info, sub_city_info))
+                                                                                self.q, cid, sub_city_id, city_info, sub_city_info))
                         )
                         min_page = max_page + 1
 
@@ -556,29 +501,15 @@ class SpiderTYCClass(BASECLASS):
 
         while 1:
             try:
-                if q.empty():
+                if self.q.empty():
                     break
-                self.ret_res_list.append(q.get_nowait())
+                self.ret_res_list.append(self.q.get_nowait())
             except:
                 pass
 
-        if STORE_EXCEL:
-            if (MIN_PAGE and MAX_PAGE):
-                to_excel_name = os.path.join(get_excel_folder(), '%s[%s]-%s[%s~%s].xls'
-                                             % (get_now(), API_MODE, '_'.join(self.keys), MIN_PAGE, MAX_PAGE))
-            else:
-                to_excel_name = os.path.join(get_excel_folder(), '%s[%s]-%s[ALL].xls' % (get_now(), API_MODE, '_'.join(self.keys)))
-            self.excel_client.to_excel(self.ret_res_list, ATTRS_DICT, to_excel_name)
-            LOG.info(to_excel_name)
-        if STORE_DB:
-            self.enterprise_service.adds(self.ret_res_list)
-            LOG.info('DB is finished[%s ~ %s]: %s' % (MIN_PAGE, MAX_PAGE, '_'.join(self.keys))) \
-                if (MIN_PAGE and MAX_PAGE) else LOG.info('DB is finished[ALL]: %s' % ('_'.join(self.keys)))
+        self.to_store(self.keys, MIN_PAGE, MAX_PAGE)
 
     def _process_by_key_only_sub_city(self):
-        manager = multiprocessing.Manager()
-        q = manager.Queue()
-
         pool = multiprocessing.Pool(processes=(MAX_CPU - 1 if MAX_CPU > 2 else 1))
         LOG.info('Main process: %s, run cpu count: %s' % (os.getpid(), (MAX_CPU - 1 if MAX_CPU > 2 else 1)))
         process = list()
@@ -614,9 +545,7 @@ class SpiderTYCClass(BASECLASS):
                 max_pagination = int(max_pagination)
                 LOG.info('[%s][%s][%s-%s]spider page: %s ~ %s ||| max_pagination: %s ||| max range: %s'
                          % (RUN_MODE, key, city_full_name, sub_city_info.get('full_name'), min_page, max_page, max_pagination, max_range))
-                if not max_range:
-                    LOG.error("It's not have max range")
-                    sys.exit()
+                self._is_not_max_range_die(max_range)
 
                 for i in range(0, max_range, 1):
                     max_page = min_page + PAGINATION
@@ -624,7 +553,7 @@ class SpiderTYCClass(BASECLASS):
                         max_page = max_pagination
                     process.append(
                         pool.apply_async(self.tyc_client.work_by_key, args=(key, min_page, max_page, 'city',
-                                                                            q, city_id, sub_city_id, city_info, sub_city_info))
+                                                                            self.q, city_id, sub_city_id, city_info, sub_city_info))
                     )
                     min_page = max_page + 1
 
@@ -633,24 +562,13 @@ class SpiderTYCClass(BASECLASS):
 
         while 1:
             try:
-                if q.empty():
+                if self.q.empty():
                     break
-                self.ret_res_list.append(q.get_nowait())
+                self.ret_res_list.append(self.q.get_nowait())
             except:
                 pass
 
-        if STORE_EXCEL:
-            if (MIN_PAGE and MAX_PAGE):
-                to_excel_name = os.path.join(get_excel_folder(), '%s[%s]-%s[%s~%s].xls'
-                                             % (get_now(), API_MODE, '_'.join(self.keys), MIN_PAGE, MAX_PAGE))
-            else:
-                to_excel_name = os.path.join(get_excel_folder(), '%s[%s]-%s[ALL].xls' % (get_now(), API_MODE, '_'.join(self.keys)))
-            self.excel_client.to_excel(self.ret_res_list, ATTRS_DICT, to_excel_name)
-            LOG.info(to_excel_name)
-        if STORE_DB:
-            self.enterprise_service.adds(self.ret_res_list)
-            LOG.info('DB is finished[%s ~ %s]: %s' % (MIN_PAGE, MAX_PAGE, '_'.join(self.keys))) \
-                if (MIN_PAGE and MAX_PAGE) else LOG.info('DB is finished[ALL]: %s' % ('_'.join(self.keys)))
+        self.to_store(self.keys, MIN_PAGE, MAX_PAGE)
 
     def process_run(self):
         """
